@@ -2,7 +2,7 @@ import { forwardRef, type ReactNode } from "react";
 import { fmt, fmtGB, fmtParts } from "./api";
 import type { CleanReport } from "./types";
 
-export const APP_NAME = "Disk Doctor";
+export const APP_NAME = "DiskBreeze";
 const GB = 1024 ** 3;
 
 export interface CleanedRow {

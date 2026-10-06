@@ -1,8 +1,6 @@
-# Disk Doctor
+# DiskBreeze
 
 Find out what's filling your disk, understand it in plain English, and clean only what you choose.
-
-**Working name.** Another app called "Disk Doctor" exists on macOS, so pick a different name before a public release. The name lives in `src/Poster.tsx` (`APP_NAME`), `src-tauri/tauri.conf.json` and `index.html`.
 
 ## What it does
 

@@ -3,8 +3,8 @@
 
 fn main() {
     if std::env::args().any(|a| a == "--scan-json") {
-        println!("{}", disk_doctor_lib::scan_json());
+        println!("{}", diskbreeze_lib::scan_json());
         return;
     }
-    disk_doctor_lib::run()
+    diskbreeze_lib::run()
 }

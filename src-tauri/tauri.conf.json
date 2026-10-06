@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Disk Doctor",
+  "productName": "DiskBreeze",
   "version": "0.1.0",
-  "identifier": "com.diskdoctor.app",
+  "identifier": "com.diskbreeze.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Disk Doctor",
+        "title": "DiskBreeze",
         "width": 1040,
         "height": 760,
         "minWidth": 760,

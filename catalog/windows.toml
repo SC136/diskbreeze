@@ -1,6 +1,6 @@
-# Disk Doctor catalog for Windows
+# DiskBreeze catalog for Windows
 #
-# Each [[item]] teaches Disk Doctor about one thing that fills up disks.
+# Each [[item]] teaches DiskBreeze about one thing that fills up disks.
 # Adding an entry here is the easiest way to contribute. No Rust needed.
 #
 # paths   %ENV% variables, {home} {downloads} {videos} {pictures} {steam},

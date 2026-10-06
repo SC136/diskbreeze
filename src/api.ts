@@ -10,8 +10,8 @@ const mockFindings: Finding[] = [
   f("old-project-builds", "Build files in old projects", "Old project builds", "safe", 66 * GB,
     "node_modules, build output and virtual environments in 192 projects you haven't edited in 60+ days. Your code isn't touched; these folders are rebuilt from it.",
     "When you go back to a project, run its install or build step again.", "Deletes 192 folders",
-    [["C:\\code\\CANTEEN\\CanteenApp\\node_modules", 4.7 * GB, "node_modules · last edited 3 months ago"], ["C:\\code\\md\\src-tauri\\target", 7.6 * GB, "target · last edited 4 months ago"],
-     ["C:\\code\\audio trimmer\\one shot by anti opus\\build", 2.4 * GB, "build · last edited 5 months ago"], ["C:\\code\\Hayai Music\\web\\.next", 1.5 * GB, ".next · last edited 2 months ago"]]),
+    [["C:\\code\\shop-app\\node_modules", 4.7 * GB, "node_modules · last edited 3 months ago"], ["C:\\code\\notes-app\\src-tauri\\target", 7.6 * GB, "target · last edited 4 months ago"],
+     ["C:\\code\\video-tool\\build", 2.4 * GB, "build · last edited 5 months ago"], ["C:\\code\\music-site\\web\\.next", 1.5 * GB, ".next · last edited 2 months ago"]]),
   f("npm-cache", "npm cache", "Developer caches", "safe", 2.9 * GB, "A copy of every npm package you've ever installed.", "The next npm install downloads packages again.", "Runs `npm cache clean --force`", []),
   f("gradle-caches", "Gradle caches", "Developer caches", "safe", 16.3 * GB, "Dependencies and build caches for Gradle and Android projects, often for many old Gradle versions.", "The next Gradle or Android build downloads dependencies again. Close Android Studio first.", "Deletes 1 folder", []),
   f("browser-caches", "Browser caches", "Browsers & apps", "safe", 4.4 * GB, "Copies of websites your browsers keep to load pages faster. Logins, history and bookmarks are not touched.", "Sites load a little slower the first time. Close your browsers first so nothing is skipped.", "Empties 27 folders", []),
@@ -31,7 +31,7 @@ function f(id: string, name: string, category: string, tier: Finding["tier"], by
   return {
     id, name, category, tier, what, after, bytes: Math.round(bytes), action, recycles, open: null,
     selectable: items.length > 1 && tier !== "manual",
-    how: tier === "manual" ? "Open the app and remove what you don't use. Disk Doctor can't do this one for you safely." : null,
+    how: tier === "manual" ? "Open the app and remove what you don't use. DiskBreeze can't do this one for you safely." : null,
     items: items.map(([path, b, note]) => ({ path, bytes: Math.round(b), note, open: null })),
   };
 }

@@ -98,7 +98,7 @@ fn save_poster(png_base64: String) -> Result<String, String> {
     Ok(path.to_string_lossy().into_owned())
 }
 
-/// `disk-doctor --scan-json` prints a scan as JSON; handy for testing and bug reports.
+/// `diskbreeze --scan-json` prints a scan as JSON; handy for testing and bug reports.
 pub fn scan_json() -> String {
     serde_json::to_string_pretty(&scan::run(|_, _| {})).unwrap_or_default()
 }
