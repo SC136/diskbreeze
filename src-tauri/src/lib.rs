@@ -93,7 +93,8 @@ fn reveal(path: String, state: State<'_, AppState>) -> Result<(), String> {
 fn save_poster(png_base64: String) -> Result<String, String> {
     let bytes = base64::engine::general_purpose::STANDARD.decode(png_base64).map_err(|e| e.to_string())?;
     let dir = dirs::picture_dir().ok_or("No Pictures folder")?;
-    let path = dir.join(format!("disk-cleanup-{}.png", chrono::Local::now().format("%Y-%m-%d")));
+    // Time-stamped so saving twice in one day never overwrites an earlier card.
+    let path = dir.join(format!("diskbreeze-{}.png", chrono::Local::now().format("%Y-%m-%d-%H%M%S")));
     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
