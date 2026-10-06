@@ -1,0 +1,504 @@
+# Disk Doctor catalog for Windows
+#
+# Each [[item]] teaches Disk Doctor about one thing that fills up disks.
+# Adding an entry here is the easiest way to contribute. No Rust needed.
+#
+# paths   %ENV% variables, {home} {downloads} {videos} {pictures} {steam},
+#         and * or ? wildcards inside a single folder name.
+# tier    safe   = rebuilds itself; pre-selected
+#         ask    = the user's own stuff or a big re-download; never pre-selected
+#         manual = we explain, the user does it (admin rights, another app)
+# action  delete   = remove the folders
+#         contents = empty the folders, keep the folders themselves
+#         recycle  = move to the Recycle Bin (anything personal)
+#         command  = run the tool's own clean command; `fallback` if it fails
+#         manual   = nothing automatic; `how` explains, `open` links somewhere
+# min_mb  hide the entry when it's smaller than this (default 50)
+#
+# Rule of thumb: if you aren't sure something regenerates, it's `ask`, not `safe`.
+
+# ───────────────────────────── Developer caches ─────────────────────────────
+
+[[item]]
+id = "npm-cache"
+name = "npm cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\npm-cache']
+what = "A copy of every npm package you've ever installed."
+after = "The next npm install downloads packages again."
+action = "command"
+command = "npm cache clean --force"
+fallback = "contents"
+
+[[item]]
+id = "pnpm-store"
+name = "pnpm store"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\pnpm\store']
+what = "pnpm's shared package store."
+after = "Only packages no project uses anymore are removed, so this can free less than shown. Clean old project builds at the same time to free more."
+action = "command"
+command = "pnpm store prune"
+
+[[item]]
+id = "yarn-cache"
+name = "Yarn cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\Yarn\Cache']
+what = "Yarn's copy of every package it has downloaded."
+after = "The next yarn install downloads packages again."
+action = "command"
+command = "yarn cache clean"
+fallback = "contents"
+
+[[item]]
+id = "bun-cache"
+name = "Bun cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\.bun\install\cache']
+what = "Bun's package download cache."
+after = "The next bun install downloads packages again."
+action = "contents"
+
+[[item]]
+id = "pip-cache"
+name = "pip cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\pip\cache']
+what = "Python packages pip downloaded before."
+after = "The next pip install downloads packages again."
+action = "contents"
+
+[[item]]
+id = "uv-cache"
+name = "uv cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\uv\cache']
+what = "uv's Python package cache."
+after = "The next uv sync downloads packages again."
+action = "command"
+command = "uv cache clean"
+fallback = "contents"
+
+[[item]]
+id = "conda-pkgs"
+name = "Conda package cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\miniconda3\pkgs', '{home}\anaconda3\pkgs', '{home}\.conda\pkgs']
+what = "Downloaded conda packages and tarballs."
+after = "Uses conda's own cleanup, so your environments keep working."
+action = "command"
+command = "conda clean --all --yes"
+
+[[item]]
+id = "gradle-caches"
+name = "Gradle caches"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\.gradle\caches']
+what = "Dependencies and build caches for Gradle and Android projects, often for many old Gradle versions."
+after = "The next Gradle or Android build downloads dependencies again. Close Android Studio first."
+action = "delete"
+
+[[item]]
+id = "gradle-wrappers"
+name = "Gradle versions"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\.gradle\wrapper\dists']
+what = "Full copies of every Gradle version your projects have used."
+after = "Each project downloads the Gradle version it needs on its next build."
+action = "delete"
+
+[[item]]
+id = "maven-repo"
+name = "Maven repository"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\.m2\repository']
+what = "Java libraries Maven downloaded."
+after = "The next Maven build downloads them again."
+action = "delete"
+
+[[item]]
+id = "nuget-cache"
+name = "NuGet packages"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\.nuget\packages']
+what = ".NET packages NuGet downloaded."
+after = "The next dotnet restore downloads them again."
+action = "command"
+command = "dotnet nuget locals all --clear"
+fallback = "contents"
+
+[[item]]
+id = "cargo-registry"
+name = "Cargo registry"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\.cargo\registry\cache', '{home}\.cargo\registry\src', '{home}\.cargo\git\checkouts']
+what = "Downloaded Rust crates and their unpacked sources."
+after = "The next cargo build downloads crates again."
+action = "delete"
+
+[[item]]
+id = "go-build-cache"
+name = "Go build cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\go-build']
+what = "Compiled Go packages, kept to speed up builds."
+after = "The next go build is a bit slower."
+action = "command"
+command = "go clean -cache"
+fallback = "contents"
+
+[[item]]
+id = "go-mod-cache"
+name = "Go module cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\go\pkg\mod']
+what = "Downloaded Go modules."
+after = "The next go build downloads modules again."
+action = "command"
+command = "go clean -modcache"
+fallback = "delete"
+
+[[item]]
+id = "pub-cache"
+name = "Dart/Flutter package cache"
+category = "Developer caches"
+tier = "ask"
+paths = ['%LOCALAPPDATA%\Pub\Cache']
+what = "Packages Flutter and Dart downloaded."
+after = "Run flutter pub get in each project again. Globally activated Dart tools need re-activating."
+action = "command"
+command = "dart pub cache clean --force"
+
+[[item]]
+id = "electron-cache"
+name = "Electron and node-gyp downloads"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\electron\Cache', '%LOCALAPPDATA%\node-gyp\Cache']
+what = "Electron binaries and Node headers downloaded while building apps."
+after = "Downloaded again the next time a project needs them."
+action = "contents"
+
+[[item]]
+id = "playwright-browsers"
+name = "Playwright test browsers"
+category = "Developer caches"
+tier = "ask"
+paths = ['%LOCALAPPDATA%\ms-playwright']
+what = "Chromium, Firefox and WebKit builds used for automated tests."
+after = "Run npx playwright install when you need them again."
+action = "delete"
+
+[[item]]
+id = "puppeteer-browsers"
+name = "Puppeteer test browsers"
+category = "Developer caches"
+tier = "ask"
+paths = ['{home}\.cache\puppeteer']
+what = "Chrome builds Puppeteer downloaded for automation."
+after = "Puppeteer downloads them again on its next install."
+action = "delete"
+
+[[item]]
+id = "arduino-staging"
+name = "Arduino download leftovers"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\Arduino15\staging']
+what = "Archives the Arduino IDE downloaded while installing boards and libraries. They're already installed."
+after = "Nothing changes. Your installed boards and libraries stay."
+action = "contents"
+
+[[item]]
+id = "espressif-dist"
+name = "ESP-IDF download leftovers"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\.espressif\dist']
+what = "Archives ESP-IDF downloaded while installing its tools. The tools are already installed."
+after = "Nothing changes. Installed toolchains stay."
+action = "contents"
+
+[[item]]
+id = "platformio-cache"
+name = "PlatformIO cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['{home}\.platformio\.cache']
+what = "PlatformIO's download cache."
+after = "Downloaded again when needed."
+action = "contents"
+
+[[item]]
+id = "editor-caches"
+name = "Code editor caches"
+category = "Developer caches"
+tier = "safe"
+paths = [
+  '%APPDATA%\Code\Cache', '%APPDATA%\Code\CachedData', '%APPDATA%\Code\CachedExtensionVSIXs', '%APPDATA%\Code\Code Cache', '%APPDATA%\Code\logs',
+  '%APPDATA%\Code - Insiders\Cache', '%APPDATA%\Code - Insiders\CachedData', '%APPDATA%\Code - Insiders\CachedExtensionVSIXs',
+  '%APPDATA%\Cursor\Cache', '%APPDATA%\Cursor\CachedData', '%APPDATA%\Cursor\CachedExtensionVSIXs',
+]
+what = "Caches, logs and leftover update files from VS Code and Cursor."
+after = "Nothing visible. Close your editor first so nothing is skipped."
+action = "contents"
+
+[[item]]
+id = "android-emulators"
+name = "Android emulators"
+category = "Developer caches"
+tier = "manual"
+paths = ['{home}\.android\avd']
+what = "Virtual Android phones created in Android Studio."
+how = "Android Studio → Device Manager → delete emulators you don't use."
+action = "manual"
+min_mb = 500
+
+[[item]]
+id = "android-sdk-extras"
+name = "Android NDK and system images"
+category = "Developer caches"
+tier = "manual"
+paths = ['%LOCALAPPDATA%\Android\Sdk\ndk', '%LOCALAPPDATA%\Android\Sdk\system-images']
+what = "Native toolchains and emulator images. It's easy to collect several old versions."
+how = "Android Studio → Settings → SDK Manager → SDK Tools / SDK Platforms → untick old versions."
+action = "manual"
+min_mb = 1000
+
+[[item]]
+id = "docker-data"
+name = "Docker Desktop data"
+category = "Developer caches"
+tier = "manual"
+paths = ['%LOCALAPPDATA%\Docker\wsl']
+what = "Docker's virtual disk with your images, containers and build cache. It grows and never shrinks on its own."
+how = "Run docker system prune -a to remove unused images. Docker Desktop → Troubleshoot can also clean or purge data."
+action = "manual"
+min_mb = 1000
+
+# ──────────────────────────────── AI models ────────────────────────────────
+
+[[item]]
+id = "huggingface-hub"
+name = "Hugging Face models"
+category = "AI models"
+tier = "ask"
+paths = ['{home}\.cache\huggingface\hub']
+what = "AI models downloaded by Python scripts (transformers, diffusers…)."
+after = "Each model downloads again the next time a script loads it. Big ones take a while."
+action = "delete"
+
+[[item]]
+id = "torch-hub"
+name = "PyTorch model cache"
+category = "AI models"
+tier = "ask"
+paths = ['{home}\.cache\torch']
+what = "Model weights downloaded by PyTorch."
+after = "Downloaded again when a script needs them."
+action = "delete"
+
+[[item]]
+id = "ollama-models"
+name = "Ollama models"
+category = "AI models"
+tier = "manual"
+paths = ['{home}\.ollama\models']
+what = "Local AI models you've pulled with Ollama."
+how = "Run ollama list, then ollama rm <name> for models you don't use."
+action = "manual"
+min_mb = 1000
+
+[[item]]
+id = "lmstudio-models"
+name = "LM Studio models"
+category = "AI models"
+tier = "manual"
+paths = ['{home}\.lmstudio\models', '{home}\.cache\lm-studio\models']
+what = "Local AI models downloaded in LM Studio."
+how = "LM Studio → My Models → delete the ones you don't use."
+action = "manual"
+min_mb = 1000
+
+[[item]]
+id = "chrome-ai-model"
+name = "Chrome's built-in AI model"
+category = "AI models"
+tier = "manual"
+paths = [
+  '%LOCALAPPDATA%\Google\Chrome\User Data\OptGuideOnDeviceModel',
+  '%LOCALAPPDATA%\Google\Chrome Beta\User Data\OptGuideOnDeviceModel',
+  '%LOCALAPPDATA%\Google\Chrome Dev\User Data\OptGuideOnDeviceModel',
+  '%LOCALAPPDATA%\Google\Chrome SxS\User Data\OptGuideOnDeviceModel',
+]
+what = "Gemini Nano, used by Chrome features like Help me write. Each copy of Chrome downloads its own (about 4 GB)."
+how = "If you don't use those features: open chrome://flags/#optimization-guide-on-device-model in each Chrome, set it to Disabled and relaunch. Deleting the folder alone doesn't help, because Chrome downloads it again."
+action = "manual"
+min_mb = 500
+
+# ──────────────────────────── Browsers and apps ────────────────────────────
+
+[[item]]
+id = "browser-caches"
+name = "Browser caches"
+category = "Browsers & apps"
+tier = "safe"
+paths = [
+  '%LOCALAPPDATA%\Google\Chrome\User Data\*\Cache', '%LOCALAPPDATA%\Google\Chrome\User Data\*\Code Cache', '%LOCALAPPDATA%\Google\Chrome\User Data\*\GPUCache',
+  '%LOCALAPPDATA%\Google\Chrome Beta\User Data\*\Cache', '%LOCALAPPDATA%\Google\Chrome Beta\User Data\*\Code Cache',
+  '%LOCALAPPDATA%\Microsoft\Edge\User Data\*\Cache', '%LOCALAPPDATA%\Microsoft\Edge\User Data\*\Code Cache', '%LOCALAPPDATA%\Microsoft\Edge\User Data\*\GPUCache',
+  '%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data\*\Cache', '%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data\*\Code Cache',
+  '%LOCALAPPDATA%\Mozilla\Firefox\Profiles\*\cache2',
+]
+what = "Copies of websites your browsers keep to load pages faster. Logins, history and bookmarks are not touched."
+after = "Sites load a little slower the first time. Close your browsers first so nothing is skipped."
+action = "contents"
+
+[[item]]
+id = "discord-cache"
+name = "Discord cache"
+category = "Browsers & apps"
+tier = "safe"
+paths = ['%APPDATA%\discord\Cache', '%APPDATA%\discord\Code Cache']
+what = "Images and files Discord cached while you scrolled."
+after = "Nothing visible. Close Discord first."
+action = "contents"
+
+[[item]]
+id = "slack-cache"
+name = "Slack cache"
+category = "Browsers & apps"
+tier = "safe"
+paths = ['%APPDATA%\Slack\Cache', '%APPDATA%\Slack\Code Cache']
+what = "Images and files Slack cached."
+after = "Nothing visible. Close Slack first."
+action = "contents"
+
+[[item]]
+id = "spotify-cache"
+name = "Spotify cache"
+category = "Browsers & apps"
+tier = "ask"
+paths = ['%LOCALAPPDATA%\Spotify\Storage']
+what = "Songs Spotify kept locally so they start faster."
+after = "Songs stream again. Downloaded playlists may need to download again."
+action = "contents"
+
+# ───────────────────────────────── Games ─────────────────────────────────
+
+[[item]]
+id = "shader-caches"
+name = "Graphics shader caches"
+category = "Games"
+tier = "safe"
+paths = [
+  '%LOCALAPPDATA%\NVIDIA\DXCache', '%LOCALAPPDATA%\NVIDIA\GLCache', '%LOCALAPPDATA%\D3DSCache',
+  '%LOCALAPPDATA%\AMD\DxCache', '%LOCALAPPDATA%\AMD\DxcCache', '%LOCALAPPDATA%\AMD\VkCache',
+]
+what = "Pre-compiled graphics code your GPU driver saves for games."
+after = "Games may stutter briefly the first time while it rebuilds."
+action = "contents"
+
+[[item]]
+id = "steam-shadercache"
+name = "Steam shader cache"
+category = "Games"
+tier = "ask"
+paths = ['{steam}\steamapps\shadercache']
+what = "Pre-compiled shaders Steam keeps for each game."
+after = "Steam rebuilds them; games can stutter at first."
+action = "contents"
+
+[[item]]
+id = "steam-background-recordings"
+name = "Steam background recordings"
+category = "Videos"
+tier = "ask"
+paths = ['{videos}\Steam\video']
+what = "Gameplay Steam records in the background so you can save clips later."
+after = "Older moments can't be turned into clips anymore. Clips you already saved are kept."
+action = "recycle"
+
+[[item]]
+id = "steam-clips"
+name = "Saved Steam clips"
+category = "Videos"
+tier = "ask"
+paths = ['{videos}\Steam\clips']
+what = "Clips you saved from Steam game recording."
+after = "They go to the Recycle Bin, so you can still change your mind."
+action = "recycle"
+
+# ──────────────────────────────── Windows ────────────────────────────────
+
+[[item]]
+id = "temp-files"
+name = "Temporary files"
+category = "Windows"
+tier = "safe"
+paths = ['%TEMP%']
+what = "Leftovers from installers and apps. Anything changed in the last 2 days is kept."
+after = "Nothing visible. Files in use are skipped."
+action = "contents"
+min_age_days = 2
+
+[[item]]
+id = "crash-dumps"
+name = "Crash dumps and error reports"
+category = "Windows"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\CrashDumps', '%LOCALAPPDATA%\Microsoft\Windows\WER']
+what = "Memory snapshots and reports saved when apps crashed."
+after = "Nothing visible."
+action = "contents"
+min_mb = 20
+
+[[item]]
+id = "windows-update-leftovers"
+name = "Windows Update leftovers"
+category = "Windows"
+tier = "manual"
+paths = ['%WINDIR%\SoftwareDistribution\Download']
+what = "Update files Windows already installed."
+how = "Open Disk Cleanup → Clean up system files → tick Windows Update Cleanup. Needs admin rights."
+open = "run:cleanmgr"
+action = "manual"
+min_mb = 500
+
+[[item]]
+id = "windows-old"
+name = "Previous Windows installation"
+category = "Windows"
+tier = "manual"
+paths = ['%SystemDrive%\Windows.old']
+what = "A backup of your old Windows from the last big upgrade. You only need it to roll back."
+how = "Settings → System → Storage → Temporary files → tick Previous Windows installation(s)."
+open = "ms-settings:storagesense"
+action = "manual"
+min_mb = 1000
+
+[[item]]
+id = "hibernation-file"
+name = "Hibernation file"
+category = "Windows"
+tier = "manual"
+paths = ['%SystemDrive%\hiberfil.sys']
+what = "Where Windows saves memory when the PC hibernates. Fast Startup uses it too."
+how = "If you never hibernate, open Terminal as admin and run powercfg /h off. You lose Hibernate and Fast Startup."
+action = "manual"
+min_mb = 2000
