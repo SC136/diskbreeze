@@ -53,6 +53,26 @@ impl Plan {
     pub fn recycles(&self) -> bool {
         matches!(self, Plan::Recycle(_))
     }
+
+    /// True when the plan acts on a list of paths, so the user can pick which ones.
+    pub fn itemizable(&self) -> bool {
+        matches!(self, Plan::Delete(_) | Plan::Recycle(_) | Plan::DeleteContents { .. })
+    }
+
+    /// Keep only the paths in `keep` (lowercased path strings). Other plans are unchanged.
+    pub fn restrict(&self, keep: &std::collections::HashSet<String>) -> Plan {
+        let pick = |v: &Vec<PathBuf>| -> Vec<PathBuf> {
+            v.iter().filter(|p| keep.contains(&p.to_string_lossy().to_lowercase())).cloned().collect()
+        };
+        match self {
+            Plan::Delete(v) => Plan::Delete(pick(v)),
+            Plan::Recycle(v) => Plan::Recycle(pick(v)),
+            Plan::DeleteContents { dirs, min_age_days } => {
+                Plan::DeleteContents { dirs: pick(dirs), min_age_days: *min_age_days }
+            }
+            other => other.clone(),
+        }
+    }
 }
 
 fn plural(n: usize) -> &'static str {
@@ -60,6 +80,22 @@ fn plural(n: usize) -> &'static str {
         ""
     } else {
         "s"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn restrict_keeps_only_chosen_paths() {
+        let plan = Plan::Recycle(vec![PathBuf::from(r"C:\a\One.iso"), PathBuf::from(r"C:\a\two.iso")]);
+        let keep: HashSet<String> = [r"c:\a\one.iso".to_string()].into();
+        let Plan::Recycle(left) = plan.restrict(&keep) else { panic!("plan kind changed") };
+        assert_eq!(left, vec![PathBuf::from(r"C:\a\One.iso")]);
+        assert!(plan.itemizable());
+        assert!(!Plan::EmptyRecycleBin.itemizable());
     }
 }
 
@@ -83,11 +119,20 @@ pub struct Finding {
     pub how: Option<String>,
     pub open: Option<String>,
     pub bytes: u64,
+    /// The user can tick individual items instead of all-or-nothing.
+    pub selectable: bool,
     pub items: Vec<Item>,
     pub recycles: bool,
     pub action: String,
     #[serde(skip)]
     pub plan: Plan,
+}
+
+/// What the UI asks to clean: a finding id, and optionally only some of its items.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct Selection {
+    pub id: String,
+    pub paths: Option<Vec<String>>,
 }
 
 impl Finding {

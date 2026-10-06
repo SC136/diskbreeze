@@ -148,6 +148,7 @@ pub fn detect(roots: &[PathBuf]) -> ProjectScan {
             how: None,
             open: None,
             bytes,
+            selectable: items.len() > 1,
             items,
             recycles: false,
             action: plan.summary(),

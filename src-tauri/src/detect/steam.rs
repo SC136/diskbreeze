@@ -41,6 +41,7 @@ pub fn detect() -> Option<Finding> {
         how: Some("Uninstall the ones you don't play anymore. Click a game to open Steam's uninstall prompt.".into()),
         open: Some("steam://open/games".into()),
         bytes,
+        selectable: false,
         items: games,
         recycles: false,
         action: Plan::Manual.summary(),

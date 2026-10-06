@@ -137,6 +137,7 @@ fn resolve(e: &Entry) -> Option<Finding> {
         how: e.how.clone(),
         open: e.open.clone(),
         bytes,
+        selectable: plan.itemizable() && items.len() > 1,
         items,
         recycles: plan.recycles(),
         action: plan.summary(),

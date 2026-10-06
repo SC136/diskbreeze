@@ -113,6 +113,7 @@ fn make(id: &str, name: &str, what: &str, mut items: Vec<Item>) -> Option<Findin
         how: None,
         open: None,
         bytes,
+        selectable: items.len() > 1,
         items,
         recycles: true,
         action: plan.summary(),

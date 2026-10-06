@@ -1,23 +1,33 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Badge, Body1, Button, Caption1, Card, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
-  DialogTitle, FluentProvider, LargeTitle, MessageBar, MessageBarBody, ProgressBar, Spinner, Subtitle1, Subtitle2,
-  Text, Title2, Title3,
+  Badge, Body1, Button, Caption1, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
+  DialogTitle, FluentProvider, LargeTitle, MessageBar, MessageBarBody, Spinner, Tab, TabList, Text,
 } from "@fluentui/react-components";
-import { ArrowSync20Regular, Open16Regular, FolderOpen16Regular } from "@fluentui/react-icons";
+import {
+  ArrowSync20Regular, ChevronDown20Regular, ChevronUp20Regular, FolderOpen16Regular, Open16Regular,
+} from "@fluentui/react-icons";
 import { toPng } from "html-to-image";
 import { APP_NAME, Poster } from "./Poster";
 import { clean, fmt, inTauri, openTarget, reveal, savePoster, scan } from "./api";
 import { darkTheme, lightTheme } from "./theme";
-import type { CleanReport, Finding, ScanResult, Tier } from "./types";
+import type { CleanReport, Finding, ScanResult, Selection, Tier } from "./types";
 
 type Phase = "idle" | "scanning" | "results" | "confirm" | "cleaning" | "done";
+/** Items the user un-ticked inside a ticked finding, by finding id. */
+type Excluded = Record<string, Set<string>>;
 
 const TIERS: { tier: Tier; title: string; blurb: string }[] = [
   { tier: "safe", title: "Safe to clean", blurb: "Rebuilds itself. Nothing you made is touched." },
   { tier: "ask", title: "Your call", blurb: "Your own files or big downloads. Nothing here is ticked for you." },
   { tier: "manual", title: "Do it yourself", blurb: "These need another app or admin rights, so we only explain." },
 ];
+
+const selBytes = (f: Finding, ex: Excluded) => {
+  const e = ex[f.id];
+  if (!f.selectable || !e || e.size === 0) return f.bytes;
+  return f.items.filter((i) => !e.has(i.path)).reduce((s, i) => s + i.bytes, 0);
+};
+const selCount = (f: Finding, ex: Excluded) => (f.selectable ? f.items.length - (ex[f.id]?.size ?? 0) : f.items.length);
 
 function useDarkMode() {
   const q = window.matchMedia("(prefers-color-scheme: dark)");
@@ -28,7 +38,7 @@ function useDarkMode() {
     const on = (e: MediaQueryListEvent) => !forced && setDark(e.matches);
     q.addEventListener("change", on);
     return () => q.removeEventListener("change", on);
-  }, [q]);
+  }, [q, forced]);
   return dark;
 }
 
@@ -37,9 +47,12 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [excluded, setExcluded] = useState<Excluded>({});
   const [report, setReport] = useState<CleanReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const safeIds = (r: ScanResult) => new Set(r.findings.filter((x) => x.tier === "safe").map((x) => x.id));
 
   async function startScan() {
     setPhase("scanning");
@@ -47,7 +60,8 @@ export default function App() {
     try {
       const r = await scan(setProgress);
       setResult(r);
-      setPicked(new Set(r.findings.filter((x) => x.tier === "safe").map((x) => x.id)));
+      setChecked(safeIds(r));
+      setExcluded({});
       setPhase("results");
     } catch (e) {
       setError(String(e));
@@ -55,15 +69,64 @@ export default function App() {
     }
   }
 
+  const chosen = useMemo(() => result?.findings.filter((f) => checked.has(f.id)) ?? [], [result, checked]);
+  const chosenBytes = chosen.reduce((s, f) => s + selBytes(f, excluded), 0);
+
+  function selections(): Selection[] {
+    return chosen.map((f) => {
+      const ex = excluded[f.id];
+      return f.selectable && ex && ex.size > 0
+        ? { id: f.id, paths: f.items.filter((i) => !ex.has(i.path)).map((i) => i.path) }
+        : { id: f.id };
+    });
+  }
+
   async function runClean() {
     setPhase("cleaning");
     try {
-      setReport(await clean([...picked]));
+      setReport(await clean(selections()));
       setPhase("done");
     } catch (e) {
       setError(String(e));
       setPhase("results");
     }
+  }
+
+  function toggleFinding(f: Finding) {
+    const next = new Set(checked);
+    next.has(f.id) ? next.delete(f.id) : next.add(f.id);
+    setChecked(next);
+    setExcluded({ ...excluded, [f.id]: new Set() });
+  }
+
+  function toggleItem(f: Finding, path: string) {
+    const ex = new Set(excluded[f.id] ?? []);
+    const next = new Set(checked);
+    if (!next.has(f.id)) {
+      // Ticking one item of an unticked finding selects just that item.
+      f.items.forEach((i) => i.path !== path && ex.add(i.path));
+      next.add(f.id);
+    } else {
+      ex.has(path) ? ex.delete(path) : ex.add(path);
+      if (ex.size === f.items.length) {
+        next.delete(f.id);
+        ex.clear();
+      }
+    }
+    setChecked(next);
+    setExcluded({ ...excluded, [f.id]: ex });
+  }
+
+  function setTier(tier: Tier, on: boolean) {
+    if (!result) return;
+    const next = new Set(checked);
+    result.findings.filter((f) => f.tier === tier).forEach((f) => (on ? next.add(f.id) : next.delete(f.id)));
+    setChecked(next);
+    setExcluded((ex) => {
+      const copy = { ...ex };
+      result.findings.filter((f) => f.tier === tier).forEach((f) => delete copy[f.id]);
+      return copy;
+    });
   }
 
   // Browser-only preview helper (never runs inside the real app): ?demo=results|done|confirm
@@ -73,10 +136,9 @@ export default function App() {
     (async () => {
       const r = await scan(() => {});
       setResult(r);
-      const safe = r.findings.filter((x) => x.tier === "safe").map((x) => x.id);
-      setPicked(new Set(safe));
+      setChecked(safeIds(r));
       if (demo === "done") {
-        setReport(await clean([...safe, "downloads-disk-images"]));
+        setReport(await clean([...safeIds(r)].map((id) => ({ id }))));
         setPhase("done");
       } else {
         setPhase(demo === "confirm" ? "confirm" : "results");
@@ -84,15 +146,13 @@ export default function App() {
     })();
   }, []);
 
-  const chosen = useMemo(() => result?.findings.filter((f) => picked.has(f.id)) ?? [], [result, picked]);
-  const chosenBytes = chosen.reduce((s, f) => s + f.bytes, 0);
   const showResults = (phase === "results" || phase === "confirm") && result;
 
   return (
     <FluentProvider theme={dark ? darkTheme : lightTheme} className="shell">
       <div className="app">
         <header className="bar">
-          <div className="brand"><span className="mark" aria-hidden />{APP_NAME}</div>
+          <div className="brand"><img className="mark" src="/logo.svg" alt="" width={24} height={24} />{APP_NAME}</div>
           {phase === "results" && (
             <Button appearance="subtle" icon={<ArrowSync20Regular />} onClick={startScan}>Scan again</Button>
           )}
@@ -102,20 +162,28 @@ export default function App() {
         {phase === "idle" && <Landing onScan={startScan} />}
         {phase === "scanning" && <Busy label={progress || "Starting…"} />}
         {phase === "cleaning" && <Busy label="Cleaning… this can take a minute for big folders." />}
-        {showResults && <Results result={result} picked={picked} setPicked={setPicked} />}
+        {showResults && (
+          <Results
+            result={result} checked={checked} excluded={excluded}
+            onFinding={toggleFinding} onItem={toggleItem} onTier={setTier}
+          />
+        )}
         {showResults && (
           <footer className="dock">
-            <Text size={400}>
-              <b>{fmt(chosenBytes)}</b> selected
-              <span className="muted"> · {chosen.length} {chosen.length === 1 ? "item" : "items"}</span>
-            </Text>
-            <Button appearance="primary" size="large" disabled={chosen.length === 0} onClick={() => setPhase("confirm")}>
-              Clean selected
-            </Button>
+            <div className="dock-sum">
+              <span className="dock-num">{fmt(chosenBytes)}</span>
+              <Caption1 className="muted">selected · {chosen.length} {chosen.length === 1 ? "category" : "categories"}</Caption1>
+            </div>
+            <div className="dock-actions">
+              <Button appearance="subtle" disabled={chosen.length === 0} onClick={() => { setChecked(new Set()); setExcluded({}); }}>Clear</Button>
+              <Button appearance="primary" size="large" disabled={chosen.length === 0} onClick={() => setPhase("confirm")}>
+                Clean selected
+              </Button>
+            </div>
           </footer>
         )}
         {phase === "confirm" && (
-          <Confirm chosen={chosen} bytes={chosenBytes} onCancel={() => setPhase("results")} onGo={runClean} />
+          <Confirm chosen={chosen} excluded={excluded} bytes={chosenBytes} onCancel={() => setPhase("results")} onGo={runClean} />
         )}
         {phase === "done" && report && result && <Done report={report} result={result} onAgain={startScan} />}
       </div>
@@ -126,6 +194,7 @@ export default function App() {
 function Landing({ onScan }: { onScan: () => void }) {
   return (
     <main className="center">
+      <img src="/logo.svg" alt="" width={84} height={84} />
       <LargeTitle as="h1">Find out what's filling your disk</LargeTitle>
       <Body1 className="lead">
         {APP_NAME} looks for caches, old build folders, forgotten downloads and big games, explains each one in plain
@@ -145,99 +214,163 @@ function Busy({ label }: { label: string }) {
   );
 }
 
-function Results({ result, picked, setPicked }: { result: ScanResult; picked: Set<string>; setPicked: (s: Set<string>) => void }) {
+function Ring({ pct }: { pct: number }) {
+  const r = 42, c = 2 * Math.PI * r;
+  const color = pct > 0.9 ? "var(--colorPaletteRedForeground1)" : pct > 0.8 ? "var(--colorPaletteDarkOrangeForeground1)" : "var(--colorBrandForeground1)";
+  return (
+    <div className="ring" role="img" aria-label={`${Math.round(pct * 100)}% full`}>
+      <svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r={r} fill="none" stroke="var(--colorNeutralStroke2)" strokeWidth="11" />
+        <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="11" strokeLinecap="round"
+          strokeDasharray={`${c * pct} ${c}`} transform="rotate(-90 50 50)" />
+      </svg>
+      <div className="ring-c"><b>{Math.round(pct * 100)}%</b><span>full</span></div>
+    </div>
+  );
+}
+
+interface ResultsProps {
+  result: ScanResult; checked: Set<string>; excluded: Excluded;
+  onFinding: (f: Finding) => void; onItem: (f: Finding, path: string) => void; onTier: (t: Tier, on: boolean) => void;
+}
+
+function Results({ result, checked, excluded, onFinding, onItem, onTier }: ResultsProps) {
   const { disk } = result;
-  const usedPct = (disk.total - disk.free) / disk.total;
+  const used = (disk.total - disk.free) / disk.total;
   const reclaimable = result.findings.filter((f) => f.tier !== "manual").reduce((s, f) => s + f.bytes, 0);
-  const toggle = (id: string) => {
-    const next = new Set(picked);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setPicked(next);
-  };
+  const tiers = TIERS.filter((t) => result.findings.some((f) => f.tier === t.tier));
+  // ?tab= and ?open= are browser-only preview helpers
+  const preview = new URLSearchParams(location.search);
+  const [tab, setTab] = useState<Tier>((!inTauri && (preview.get("tab") as Tier)) || tiers[0]?.tier || "safe");
+  const [open, setOpen] = useState<string | null>(!inTauri ? preview.get("open") : null);
+  const list = result.findings.filter((f) => f.tier === tab);
+  const max = Math.max(...list.map((f) => f.bytes), 1);
+  const current = TIERS.find((t) => t.tier === tab)!;
+  const allOn = list.length > 0 && list.every((f) => checked.has(f.id));
+
   return (
     <main className="results">
-      <div className="summary">
-        <div>
+      <section className="hero">
+        <Ring pct={used} />
+        <div className="hero-text">
           <Caption1 className="muted">Drive {disk.mount.replace("\\", "")}</Caption1>
-          <div className="free"><Title2 as="span">{fmt(disk.free)}</Title2><Body1 className="muted"> free of {fmt(disk.total)}</Body1></div>
-          <ProgressBar value={usedPct} thickness="large" color={usedPct > 0.9 ? "error" : usedPct > 0.8 ? "warning" : "brand"} aria-label={`${Math.round(usedPct * 100)}% full`} />
+          <div><span className="hero-free">{fmt(disk.free)}</span><Body1 className="muted"> free of {fmt(disk.total)}</Body1></div>
+          <Body1>
+            Up to <b>{fmt(reclaimable)}</b> can be cleaned.
+            {result.staleProjects > 0 && <> Build files in <b>{result.staleProjects}</b> old projects were found; <b>{result.activeProjects}</b> active ones were left alone.</>}
+          </Body1>
         </div>
-        <Body1 className="sum-note">
-          Up to <b>{fmt(reclaimable)}</b> can be cleaned.
-          {result.staleProjects > 0 && <> Found build files in <b>{result.staleProjects}</b> old projects; <b>{result.activeProjects}</b> active ones were left alone.</>}
-        </Body1>
+      </section>
+
+      <TabList selectedValue={tab} onTabSelect={(_, d) => { setTab(d.value as Tier); setOpen(null); }} size="large" className="tabs">
+        {tiers.map((t) => {
+          const items = result.findings.filter((f) => f.tier === t.tier);
+          return (
+            <Tab key={t.tier} value={t.tier}>
+              {t.title}
+              <span className="tab-meta">{fmt(items.reduce((s, f) => s + f.bytes, 0))}</span>
+            </Tab>
+          );
+        })}
+      </TabList>
+
+      <div className="toolbar">
+        <Caption1 className="muted">{current.blurb}</Caption1>
+        {tab !== "manual" && (
+          <Button appearance="transparent" size="small" onClick={() => onTier(tab, !allOn)}>
+            {allOn ? "Select none" : "Select all"}
+          </Button>
+        )}
       </div>
 
-      {TIERS.map(({ tier, title, blurb }) => {
-        const list = result.findings.filter((f) => f.tier === tier);
-        if (!list.length) return null;
-        return (
-          <section key={tier} className="group">
-            <div className="group-head">
-              <Subtitle1 as="h2">{title}</Subtitle1>
-              <Caption1 className="muted">{blurb}</Caption1>
-              <Subtitle2 className="group-total">{fmt(list.reduce((s, f) => s + f.bytes, 0))}</Subtitle2>
-            </div>
-            {list.map((f) => <FindingCard key={f.id} f={f} checked={picked.has(f.id)} onToggle={() => toggle(f.id)} />)}
-          </section>
-        );
-      })}
+      <div className="rows">
+        {list.map((f) => (
+          <Row
+            key={f.id} f={f} max={max} ex={excluded} on={checked.has(f.id)} open={open === f.id}
+            onOpen={() => setOpen(open === f.id ? null : f.id)}
+            onToggle={() => onFinding(f)} onItem={(p) => onItem(f, p)}
+          />
+        ))}
+      </div>
     </main>
   );
 }
 
-function FindingCard({ f, checked, onToggle }: { f: Finding; checked: boolean; onToggle: () => void }) {
-  const [open, setOpen] = useState(false);
+interface RowProps {
+  f: Finding; max: number; ex: Excluded; on: boolean; open: boolean;
+  onOpen: () => void; onToggle: () => void; onItem: (path: string) => void;
+}
+
+function Row({ f, max, ex, on, open, onOpen, onToggle, onItem }: RowProps) {
   const manual = f.tier === "manual";
   const steam = f.id === "steam-games";
+  const excl = ex[f.id];
+  const partial = on && f.selectable && !!excl && excl.size > 0;
+  const shown = partial ? selBytes(f, ex) : f.bytes;
   return (
-    <Card className={`finding ${checked ? "on" : ""}`} appearance="filled">
-      <div className="finding-row">
+    <article className={`row ${on ? "on" : ""} ${open ? "open" : ""}`}>
+      <div className="row-head">
         {manual ? <span className="chk-gap" /> : (
-          <Checkbox checked={checked} onChange={onToggle} aria-label={`Select ${f.name}`} />
+          <Checkbox checked={partial ? "mixed" : on} onChange={onToggle} aria-label={`Select ${f.name}`} />
         )}
-        <div className="finding-main">
-          <div className="finding-title">
-            <Text weight="semibold" size={400}>{f.name}</Text>
-            <Badge appearance="tint" color="informative" size="small">{f.category}</Badge>
+        <div className="row-click" onClick={onOpen}>
+          <div className="row-main">
+            <div className="row-title">
+              <Text weight="semibold" size={400}>{f.name}</Text>
+              <Badge appearance="tint" color="informative" size="small">{f.category}</Badge>
+              {partial && <Badge appearance="tint" color="brand" size="small">{selCount(f, ex)} of {f.items.length}</Badge>}
+            </div>
+            {!open && <Body1 className="row-what">{f.what}</Body1>}
           </div>
-          <Body1 className="what">{f.what}</Body1>
+          <div className="row-size">
+            <Text weight="semibold" size={500}>{fmt(shown)}</Text>
+            <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(2, (shown / max) * 100)}%` }} /></div>
+          </div>
+        </div>
+        <Button appearance="subtle" size="small" aria-expanded={open} aria-label={open ? "Hide details" : "Show details"}
+          icon={open ? <ChevronUp20Regular /> : <ChevronDown20Regular />} onClick={onOpen} />
+      </div>
+
+      {open && (
+        <div className="row-body">
+          <Body1>{f.what}</Body1>
           {f.after && !manual && <Caption1 className="muted">After: {f.after}</Caption1>}
           {manual && f.how && <Caption1 className="muted">{f.how}</Caption1>}
+          <div className="row-meta">
+            <Caption1 className="muted">{f.action}</Caption1>
+            {f.open && <Button appearance="transparent" size="small" icon={<Open16Regular />} onClick={() => openTarget(f.open!)}>Open</Button>}
+          </div>
+          {f.items.length > 0 && (
+            <ul className="items">
+              {f.items.slice(0, 200).map((i) => {
+                const name = steam ? i.note?.split(" · ")[0] ?? i.path : i.path.split("\\").pop() ?? i.path;
+                const sub = steam ? i.note?.split(" · ")[1] : [i.path.slice(0, i.path.length - name.length - 1), i.note].filter(Boolean).join(" · ");
+                return (
+                  <li key={i.path}>
+                    {f.selectable
+                      ? <Checkbox checked={on && !excl?.has(i.path)} onChange={() => onItem(i.path)} aria-label={`Select ${name}`} />
+                      : <span className="chk-gap" />}
+                    <div className="item-main" title={i.path}>
+                      <Text size={300} weight="semibold" className="item-name">{name}</Text>
+                      {sub && <Caption1 className="muted item-sub">{sub}</Caption1>}
+                    </div>
+                    <Text size={200} weight="semibold" className="item-size">{fmt(i.bytes)}</Text>
+                    {i.open
+                      ? <Button appearance="transparent" size="small" icon={<Open16Regular />} onClick={() => openTarget(i.open!)}>Uninstall…</Button>
+                      : <Button appearance="transparent" size="small" icon={<FolderOpen16Regular />} onClick={() => reveal(i.path)}>Show</Button>}
+                  </li>
+                );
+              })}
+              {f.items.length > 200 && <li className="more"><Caption1 className="muted">…and {f.items.length - 200} more, included with the selection above</Caption1></li>}
+            </ul>
+          )}
         </div>
-        <Title3 as="span" className="size">{fmt(f.bytes)}</Title3>
-      </div>
-      <div className="finding-actions">
-        <Caption1 className="muted grow">{f.action}</Caption1>
-        {f.items.length > 0 && (
-          <Button appearance="transparent" size="small" onClick={() => setOpen(!open)}>
-            {open ? "Hide" : "Show"} {f.items.length > 1 ? `${f.items.length} items` : "item"}
-          </Button>
-        )}
-        {f.open && <Button appearance="transparent" size="small" icon={<Open16Regular />} onClick={() => openTarget(f.open!)}>Open</Button>}
-      </div>
-      {open && (
-        <ul className="items">
-          {f.items.slice(0, 40).map((i) => (
-            <li key={i.path}>
-              <div className="item-main">
-                <div className="item-path" title={i.path}>{steam ? i.note?.split(" · ")[0] : i.path}</div>
-                {i.note && <Caption1 className="muted">{steam ? i.note.split(" · ")[1] : i.note}</Caption1>}
-              </div>
-              <Text weight="semibold" size={200}>{fmt(i.bytes)}</Text>
-              {i.open
-                ? <Button appearance="transparent" size="small" icon={<Open16Regular />} onClick={() => openTarget(i.open!)}>Uninstall…</Button>
-                : <Button appearance="transparent" size="small" icon={<FolderOpen16Regular />} onClick={() => reveal(i.path)}>Show</Button>}
-            </li>
-          ))}
-          {f.items.length > 40 && <li><Caption1 className="muted">…and {f.items.length - 40} more</Caption1></li>}
-        </ul>
       )}
-    </Card>
+    </article>
   );
 }
 
-function Confirm({ chosen, bytes, onCancel, onGo }: { chosen: Finding[]; bytes: number; onCancel: () => void; onGo: () => void }) {
+function Confirm({ chosen, excluded, bytes, onCancel, onGo }: { chosen: Finding[]; excluded: Excluded; bytes: number; onCancel: () => void; onGo: () => void }) {
   const permanent = chosen.some((f) => !f.recycles);
   const binSelected = chosen.some((f) => f.id === "recycle-bin");
   return (
@@ -247,9 +380,16 @@ function Confirm({ chosen, bytes, onCancel, onGo }: { chosen: Finding[]; bytes: 
           <DialogTitle>Clean {fmt(bytes)}?</DialogTitle>
           <DialogContent>
             <ul className="plan">
-              {chosen.map((f) => (
-                <li key={f.id}><b>{f.name}</b><span>{fmt(f.bytes)}</span><em>{f.action}</em></li>
-              ))}
+              {chosen.map((f) => {
+                const partial = f.selectable && (excluded[f.id]?.size ?? 0) > 0;
+                return (
+                  <li key={f.id}>
+                    <b>{f.name}{partial && <span className="muted"> · {selCount(f, excluded)} of {f.items.length} items</span>}</b>
+                    <span>{fmt(selBytes(f, excluded))}</span>
+                    <em>{f.action}</em>
+                  </li>
+                );
+              })}
             </ul>
             {permanent && (
               <MessageBar intent="warning" className="gap-top"><MessageBarBody>

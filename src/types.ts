@@ -17,9 +17,17 @@ export interface Finding {
   how: string | null;
   open: string | null;
   bytes: number;
+  /** Individual items can be ticked instead of all-or-nothing. */
+  selectable: boolean;
   items: Item[];
   recycles: boolean;
   action: string;
+}
+
+/** What the UI asks the backend to clean: a finding, optionally only some of its items. */
+export interface Selection {
+  id: string;
+  paths?: string[];
 }
 
 export interface DiskInfo {

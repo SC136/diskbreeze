@@ -53,7 +53,7 @@ export const Poster = forwardRef<HTMLDivElement, { report: CleanReport }>(({ rep
         </div>
         <div className="p-foot">
           <span>Cleaned up with</span>
-          <b>{APP_NAME}</b>
+          <b><img src="/logo.svg" alt="" width={52} height={52} />{APP_NAME}</b>
         </div>
       </div>
     </div>

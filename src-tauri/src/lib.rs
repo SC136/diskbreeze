@@ -7,7 +7,8 @@ mod scan;
 mod size;
 
 use base64::Engine;
-use model::{CleanReport, Finding, Progress, ScanResult};
+use model::{CleanReport, Finding, Progress, ScanResult, Selection};
+use std::collections::HashSet;
 use std::process::Command;
 use std::sync::Mutex;
 use tauri::{Emitter, State};
@@ -30,18 +31,34 @@ async fn scan(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<ScanR
     Ok(result)
 }
 
-/// The frontend only ever sends finding ids. What gets deleted comes from the
-/// scan we ran ourselves, never from the UI.
+/// The frontend sends finding ids, and optionally which of a finding's items to
+/// keep. Every path must be one the scan itself found; what gets deleted comes
+/// from our own scan, never from the UI.
 #[tauri::command]
-async fn clean(ids: Vec<String>, state: State<'_, AppState>) -> Result<CleanReport, String> {
-    let selected: Vec<Finding> = state
-        .findings
-        .lock()
-        .unwrap()
-        .iter()
-        .filter(|f| ids.contains(&f.id))
-        .cloned()
-        .collect();
+async fn clean(selections: Vec<Selection>, state: State<'_, AppState>) -> Result<CleanReport, String> {
+    let known = state.findings.lock().unwrap().clone();
+    let mut selected: Vec<Finding> = vec![];
+    for s in selections {
+        let Some(found) = known.iter().find(|f| f.id == s.id) else { continue };
+        let mut f = found.clone();
+        if let Some(paths) = s.paths {
+            if !f.selectable {
+                return Err(format!("{} can't be cleaned item by item", f.name));
+            }
+            if !paths.iter().all(|p| f.owns(p)) {
+                return Err("One of the selected items wasn't part of the scan".into());
+            }
+            let keep: HashSet<String> = paths.iter().map(|p| p.to_lowercase()).collect();
+            if keep.is_empty() {
+                continue;
+            }
+            f.plan = f.plan.restrict(&keep);
+            f.items.retain(|i| keep.contains(&i.path.to_lowercase()));
+            f.bytes = f.items.iter().map(|i| i.bytes).sum();
+            f.action = f.plan.summary();
+        }
+        selected.push(f);
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let before = scan::disk_info();
         let refs: Vec<&Finding> = selected.iter().collect();
