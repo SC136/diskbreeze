@@ -15,6 +15,7 @@ const mockFindings: Finding[] = [
   f("npm-cache", "npm cache", "Developer caches", "safe", 2.9 * GB, "A copy of every npm package you've ever installed.", "The next npm install downloads packages again.", "Runs `npm cache clean --force`", []),
   f("gradle-caches", "Gradle caches", "Developer caches", "safe", 16.3 * GB, "Dependencies and build caches for Gradle and Android projects, often for many old Gradle versions.", "The next Gradle or Android build downloads dependencies again. Close Android Studio first.", "Deletes 1 folder", []),
   f("browser-caches", "Browser caches", "Browsers & apps", "safe", 4.4 * GB, "Copies of websites your browsers keep to load pages faster. Logins, history and bookmarks are not touched.", "Sites load a little slower the first time. Close your browsers first so nothing is skipped.", "Empties 27 folders", []),
+  f("temp-files", "Temporary files", "Windows", "safe", 26 * MB, "Leftovers from installers and apps. Anything changed in the last 2 days is kept.", "Nothing visible. Files in use are skipped.", "Empties 1 folder", []),
   f("huggingface-hub", "Hugging Face models", "AI models", "ask", 17.7 * GB, "AI models downloaded by Python scripts (transformers, diffusers…).", "Each model downloads again the next time a script loads it.", "Deletes 1 folder", []),
   f("downloads-disk-images", "Disk images (ISO files)", "Downloads", "ask", 22.4 * GB, "Operating system and software images. Once installed or written to a USB stick you rarely need them again.", "They go to the Recycle Bin, so you can still get them back.", "Moves 10 items to the Recycle Bin",
     [["C:\\Users\\you\\Downloads\\Windows.iso", 6.6 * GB, "downloaded 3 weeks ago"], ["C:\\Users\\you\\Downloads\\ubuntu-26.04-desktop-amd64.iso", 6.1 * GB, "downloaded 4 months ago"],
@@ -101,6 +102,16 @@ export async function savePoster(pngBase64: string): Promise<string> {
   a.click();
   return "your Downloads folder";
 }
+
+/** Split a size into number + unit, for big hero numbers: 26 MB -> {n:"26", unit:"MB"}. */
+export function fmtParts(bytes: number): { n: string; unit: string } {
+  if (bytes >= GB) return { n: (bytes / GB).toFixed(bytes >= 100 * GB ? 0 : 1), unit: "GB" };
+  if (bytes >= MB) return { n: String(Math.round(bytes / MB)), unit: "MB" };
+  return { n: String(Math.max(0, Math.round(bytes / 1024))), unit: "KB" };
+}
+
+/** Free-space readouts always show one decimal so small changes stay visible. */
+export const fmtGB = (bytes: number) => `${(bytes / GB).toFixed(1)} GB`;
 
 export function fmt(bytes: number): string {
   if (bytes >= GB) return `${(bytes / GB).toFixed(bytes >= 100 * GB ? 0 : 1)} GB`;

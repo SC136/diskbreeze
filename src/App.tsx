@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge, Body1, Button, Caption1, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
-  DialogTitle, FluentProvider, LargeTitle, MessageBar, MessageBarBody, Spinner, Tab, TabList, Text,
+  DialogTitle, FluentProvider, LargeTitle, MessageBar, MessageBarBody, Spinner, Subtitle2, Tab, TabList, Text,
 } from "@fluentui/react-components";
 import {
-  ArrowSync20Regular, ChevronDown20Regular, ChevronUp20Regular, FolderOpen16Regular, Open16Regular,
+  ArrowSync20Regular, CheckmarkCircle20Filled, ChevronDown20Regular, DismissCircle20Filled, ChevronUp20Regular, FolderOpen16Regular, Open16Regular,
 } from "@fluentui/react-icons";
 import { toPng } from "html-to-image";
-import { APP_NAME, Poster } from "./Poster";
-import { clean, fmt, inTauri, openTarget, reveal, savePoster, scan } from "./api";
+import { APP_NAME, freedBytes, Poster, type CleanedRow } from "./Poster";
+import { clean, fmt, fmtGB, fmtParts, inTauri, openTarget, reveal, savePoster, scan } from "./api";
 import { darkTheme, lightTheme } from "./theme";
 import type { CleanReport, Finding, ScanResult, Selection, Tier } from "./types";
 
@@ -137,8 +137,9 @@ export default function App() {
       const r = await scan(() => {});
       setResult(r);
       setChecked(safeIds(r));
-      if (demo === "done") {
-        setReport(await clean([...safeIds(r)].map((id) => ({ id }))));
+      if (demo === "done" || demo === "small") {
+        const ids = demo === "small" ? ["temp-files"] : [...safeIds(r)];
+        setReport(await clean(ids.map((id) => ({ id }))));
         setPhase("done");
       } else {
         setPhase(demo === "confirm" ? "confirm" : "results");
@@ -416,10 +417,13 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
   const ref = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const freed = Math.max(0, report.after.free - report.before.free);
-  const recycled = report.outcomes.filter((o) => o.ok && o.recycled).reduce((s, o) => s + o.bytes, 0);
-  const failed = report.outcomes.filter((o) => !o.ok);
+  const freed = freedBytes(report);
+  const { n, unit } = fmtParts(freed);
   const name = (id: string) => result.findings.find((f) => f.id === id)?.name ?? id;
+  const done = report.outcomes.filter((o) => o.ok);
+  const failed = report.outcomes.filter((o) => !o.ok);
+  const recycled = done.filter((o) => o.recycled).reduce((s, o) => s + o.bytes, 0);
+  const rows: CleanedRow[] = done.filter((o) => o.bytes > 0).map((o) => ({ name: name(o.id), bytes: o.bytes, recycled: o.recycled }));
 
   async function save() {
     if (!ref.current) return;
@@ -435,19 +439,39 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
   return (
     <main className="done">
       <div className="done-left">
-        <Caption1 className="muted">All done</Caption1>
-        <div className="free"><LargeTitle as="span">{fmt(freed)}</LargeTitle><Body1 className="muted"> freed</Body1></div>
-        <Body1>{fmt(report.before.free)} free before. <b>{fmt(report.after.free)}</b> free now.</Body1>
+        <Caption1 className="muted">{failed.length > 0 ? "Finished with some problems" : "All done"}</Caption1>
+        <div className="free"><LargeTitle as="span">{n} {unit}</LargeTitle><Body1 className="muted"> freed</Body1></div>
+        <div className="stat-row">
+          <div className="stat"><Caption1 className="muted">Free before</Caption1><b>{fmtGB(report.before.free)}</b></div>
+          <div className="stat"><Caption1 className="muted">Free now</Caption1><b>{fmtGB(report.after.free)}</b></div>
+          <div className="stat"><Caption1 className="muted">Cleaned</Caption1><b>{done.length} of {report.outcomes.length}</b></div>
+        </div>
         {recycled > 0 && (
           <MessageBar intent="info"><MessageBarBody>
             {fmt(recycled)} went to the Recycle Bin and still uses space. Empty the bin to get it back.
           </MessageBarBody></MessageBar>
         )}
         {failed.length > 0 && (
-          <MessageBar intent="error"><MessageBarBody>
-            Couldn't finish: {failed.map((o) => `${name(o.id)} (${o.message})`).join("; ")}
+          <MessageBar intent="warning"><MessageBarBody>
+            {failed.length} {failed.length === 1 ? "item" : "items"} couldn't be cleaned. Files in use are skipped, so close the app and scan again.
           </MessageBarBody></MessageBar>
         )}
+
+        <Subtitle2 as="h2">What happened</Subtitle2>
+        <ul className="cleaned">
+          {report.outcomes.map((o) => (
+            <li key={o.id}>
+              <span className={o.ok ? "ok" : "bad"}>{o.ok ? <CheckmarkCircle20Filled /> : <DismissCircle20Filled />}</span>
+              <div className="c-name">
+                <Text weight="semibold">{name(o.id)}</Text>
+                {!o.ok && <Caption1 className="err">{o.message}</Caption1>}
+                {o.ok && o.recycled && <Caption1 className="muted">Moved to the Recycle Bin</Caption1>}
+              </div>
+              {o.ok && <Text weight="semibold">{fmt(o.bytes)}</Text>}
+            </li>
+          ))}
+        </ul>
+
         <div className="done-actions">
           <Button appearance="primary" size="large" onClick={save}>Save share card</Button>
           <Button appearance="secondary" size="large" onClick={onAgain}>Scan again</Button>
@@ -455,7 +479,7 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
         {saved && <Caption1 className="muted">Saved to {saved}</Caption1>}
         {saveError && <Caption1 className="err">{saveError}</Caption1>}
       </div>
-      <div className="poster-frame"><div className="poster-scale"><Poster ref={ref} report={report} /></div></div>
+      <div className="poster-frame"><div className="poster-scale"><Poster ref={ref} report={report} rows={rows} /></div></div>
     </main>
   );
 }
