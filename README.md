@@ -18,6 +18,12 @@ Find out what's filling your disk, understand it in plain English, and clean onl
 
 No AI and no network access: everything is rules in the catalog plus a few detectors.
 
+## Design
+
+The UI uses [Fluent 2](https://fluent2.microsoft.design/) via `@fluentui/react-components`, so it feels at home on Windows 11 (light and dark follow the system). The brand colour (teal, `src/theme.ts`), the logo and the share card are our own. Keep it that way: use the design system, not Microsoft branding.
+
+
+
 ## Safety
 
 - The UI only ever sends finding **ids**. What gets deleted comes from the scan the backend ran itself.
