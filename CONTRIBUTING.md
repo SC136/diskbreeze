@@ -53,6 +53,7 @@ min_mb = 100                     # Optional: minimum MB required to display (def
 ### Safety Golden Rules
 - **Rule of thumb:** If you aren't 100% sure an item regenerates safely, use `tier = "ask"`, never `safe`.
 - **Recycle personal files:** Anything created by the user or personal data must use `action = "recycle"`. Recycled items cannot be marked `tier = "safe"`.
+- **Check what a folder really holds before calling it a cache.** A folder named `Packages`, `Cache` or `Data` can hold installed programs or user data. For example, `%LOCALAPPDATA%\Microsoft\WinGet\Packages` holds portable programs installed by winget, not a download cache, so emptying it would delete them. When in doubt, look inside on a real machine, and say how you checked in the PR. A test (`no_entry_points_at_installed_programs`) blocks the known cases.
 - **Protected paths:** Never point to shallow system directories, drive roots, `C:\Windows`, or user root profile directories. All paths are validated against `paths::is_protected`.
 - **Admin scripts:** Scripts requiring administrator privileges must be approved and reviewed.
 
@@ -85,7 +86,7 @@ npm run build
 The desktop backend is built with Tauri v2 and Rust.
 
 ### Prerequisites
-- Node.js (v18+)
+- Node.js (v20.19+ or v22+, which is what the build tooling needs)
 - Rust toolchain (`rustup`)
 - Windows WebView2 (included by default on Windows 11)
 

@@ -201,6 +201,26 @@ mod tests {
         }
     }
 
+    /// Folders that hold installed programs or user data under a misleading "cache"-like name.
+    /// Emptying them destroys things people installed, so no catalog entry may point at them.
+    #[test]
+    fn no_entry_points_at_installed_programs() {
+        const FORBIDDEN: &[&str] = &[
+            r"microsoft\winget\packages", // portable winget installs live here, not an installer cache
+            r"microsoft\winget\links",
+            r"microsoft\windowsapps",
+            r"\program files",
+        ];
+        for e in parse(WINDOWS).unwrap() {
+            for p in &e.paths {
+                let lower = p.to_lowercase();
+                for bad in FORBIDDEN {
+                    assert!(!lower.contains(bad), "{} points at `{p}`, which holds installed programs", e.id);
+                }
+            }
+        }
+    }
+
     /// Anything that runs as administrator is reviewed here. The list of allowed building blocks is
     /// deliberately tiny: if a new admin entry needs something else, this test makes you stop and look.
     #[test]

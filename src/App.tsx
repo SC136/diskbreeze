@@ -182,14 +182,16 @@ export default function App() {
     setExcluded({ ...excluded, [f.id]: ex });
   }
 
-  function setTier(tier: Tier, on: boolean) {
+  /** Select all / none in a tab. With `ids`, only those findings (what a search filter shows). */
+  function setTier(tier: Tier, on: boolean, ids?: string[]) {
     if (!result) return;
+    const targets = result.findings.filter((f) => f.tier === tier && (!ids || ids.includes(f.id)));
     const next = new Set(checked);
-    result.findings.filter((f) => f.tier === tier).forEach((f) => (on ? next.add(f.id) : next.delete(f.id)));
+    targets.forEach((f) => (on ? next.add(f.id) : next.delete(f.id)));
     setChecked(next);
     setExcluded((ex) => {
       const copy = { ...ex };
-      result.findings.filter((f) => f.tier === tier).forEach((f) => delete copy[f.id]);
+      targets.forEach((f) => delete copy[f.id]);
       return copy;
     });
   }
@@ -429,7 +431,7 @@ function Ring({ pct }: { pct: number }) {
 
 interface ResultsProps {
   result: ScanResult; info?: DriveInfo; checked: Set<string>; excluded: Excluded;
-  onFinding: (f: Finding) => void; onItem: (f: Finding, path: string) => void; onTier: (t: Tier, on: boolean) => void;
+  onFinding: (f: Finding) => void; onItem: (f: Finding, path: string) => void; onTier: (t: Tier, on: boolean, ids?: string[]) => void;
 }
 
 function Results({ result, info, checked, excluded, onFinding, onItem, onTier }: ResultsProps) {
@@ -537,7 +539,7 @@ function Results({ result, info, checked, excluded, onFinding, onItem, onTier }:
             {copied ? "Report copied" : "Copy report"}
           </Button>
           {tab !== "manual" && (
-            <Button appearance="transparent" size="small" onClick={() => onTier(tab, !allOn)}>
+            <Button appearance="transparent" size="small" onClick={() => onTier(tab, !allOn, filtered.map((f) => f.id))}>
               {allOn ? "Select none" : "Select all"}
             </Button>
           )}

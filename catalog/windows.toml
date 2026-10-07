@@ -286,25 +286,18 @@ after = "Packages rebuild or download again on the next vcpkg install."
 action = "contents"
 min_mb = 200
 
-[[item]]
-id = "winget-cache"
-name = "WinGet installer cache"
-category = "Developer caches"
-tier = "safe"
-paths = ['%LOCALAPPDATA%\Microsoft\WinGet\Packages']
-what = "Downloaded app installer packages cached by Windows Package Manager (winget)."
-after = "WinGet downloads installers afresh next time you install or upgrade an app."
-action = "contents"
-min_mb = 100
+# NOTE: there is deliberately no WinGet entry. %LOCALAPPDATA%\Microsoft\WinGet\Packages holds
+# programs installed from *portable* winget packages (not an installer cache), so emptying it
+# would delete installed programs. winget's installer downloads live under %TEMP%\WinGet.
 
 [[item]]
 id = "unity-cache"
-name = "Unity editor cache"
+name = "Unity package cache"
 category = "Developer caches"
-tier = "safe"
+tier = "ask"
 paths = ['%LOCALAPPDATA%\Unity\cache']
-what = "Shader, texture and asset compiler cache for the Unity editor."
-after = "Unity rebuilds cache files the next time you open a project."
+what = "Unity's shared cache of downloaded packages and asset data for the editor and Unity Hub."
+after = "Unity downloads the packages again the next time you open a project that needs them, so you need an internet connection. Close Unity and Unity Hub first."
 action = "contents"
 min_mb = 200
 
@@ -312,10 +305,10 @@ min_mb = 200
 id = "unreal-ddc"
 name = "Unreal Engine Derived Data Cache"
 category = "Developer caches"
-tier = "safe"
+tier = "ask"
 paths = ['%LOCALAPPDATA%\UnrealEngine\Common\DerivedDataCache']
 what = "Compiled shaders, compressed textures and audio data cached by Unreal Engine."
-after = "Unreal re-derives asset data when opening a project that needs it."
+after = "Unreal rebuilds this when you open a project, which can take a long time (minutes to hours for big projects). Close Unreal Editor first."
 action = "contents"
 min_mb = 500
 
