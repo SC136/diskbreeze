@@ -36,6 +36,30 @@ export interface DiskInfo {
   free: number;
 }
 
+export interface HistoryOutcome {
+  name: string;
+  ok: boolean;
+  bytes: number;
+  recycled: boolean;
+  message: string | null;
+  paths: string[];
+}
+
+/** One past cleanup, from the local log. */
+export interface HistoryEntry {
+  when: string;
+  drive: string;
+  appVersion: string;
+  freeBefore: number;
+  freeAfter: number;
+  outcomes: HistoryOutcome[];
+}
+
+export interface UpdateInfo {
+  version: string;
+  notes: string | null;
+}
+
 /** A drive the user can choose to scan. */
 export interface DriveInfo {
   /** "C:" */
@@ -58,6 +82,7 @@ export interface ScanResult {
 
 export interface CleanOutcome {
   id: string;
+  name: string;
   ok: boolean;
   bytes: number;
   recycled: boolean;

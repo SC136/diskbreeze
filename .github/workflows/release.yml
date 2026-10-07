@@ -1,0 +1,78 @@
+name: Release
+
+# Push a tag like v0.2.1 to build, sign and publish a release. The in-app updater reads the
+# latest.json this creates, so releases must not be marked as pre-releases.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the app version
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne "${{ github.ref_name }}") {
+            throw "Tag ${{ github.ref_name }} doesn't match the app version v$version. Bump the version first."
+          }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Run the tests first
+        run: cargo test
+        working-directory: src-tauri
+
+      - name: Release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $file = "release-notes/${{ github.ref_name }}.md"
+          $body = if (Test-Path $file) { Get-Content $file -Raw } else { "See the commit history for what changed." }
+          $delim = "EOF_$([guid]::NewGuid().ToString('N'))"
+          "body<<$delim`n$body`n$delim" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build, sign and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: DiskBreeze ${{ github.ref_name }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
+          prerelease: false
+          uploadUpdaterJson: true
+          args: --bundles nsis
+
+      - name: Add the portable build and checksums
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          New-Item -ItemType Directory -Force out | Out-Null
+          Compress-Archive -Path src-tauri/target/release/diskbreeze.exe -DestinationPath "out/DiskBreeze_${version}_x64-portable.zip"
+          Copy-Item "src-tauri/target/release/bundle/nsis/DiskBreeze_${version}_x64-setup.exe" out/
+          Get-ChildItem out -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt
+          gh release upload $tag out/DiskBreeze_${version}_x64-portable.zip out/SHA256SUMS.txt --clobber

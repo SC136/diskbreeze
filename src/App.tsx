@@ -1,17 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge, Body1, Button, Caption1, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
-  DialogTitle, Dropdown, FluentProvider, LargeTitle, MessageBar, MessageBarBody, Option, Spinner, Subtitle2, Tab,
-  TabList, Text,
+  DialogTitle, Dropdown, FluentProvider, LargeTitle, MessageBar, MessageBarActions, MessageBarBody, Option,
+  ProgressBar, Spinner, Subtitle2, Tab, TabList, Text,
 } from "@fluentui/react-components";
 import {
-  ArrowSync20Regular, CheckmarkCircle20Filled, ChevronDown20Regular, DismissCircle20Filled, ChevronUp20Regular, FolderOpen16Regular, Open16Regular,
+  ArrowDownload20Regular, ArrowSync20Regular, CheckmarkCircle20Filled, ChevronDown20Regular, Copy20Regular,
+  DismissCircle20Filled, ChevronUp20Regular, FolderOpen16Regular, History20Regular, Open16Regular,
 } from "@fluentui/react-icons";
 import { toPng } from "html-to-image";
 import { APP_NAME, freedBytes, Poster, type CleanedRow } from "./Poster";
-import { clean, fmt, fmtGB, fmtParts, inTauri, listDrives, openTarget, reveal, savePoster, scan } from "./api";
+import {
+  appVersion, checkForUpdate, clean, fmt, fmtGB, fmtParts, getHistory, historyReport, inTauri, installUpdate, listDrives,
+  openHistoryFolder, openTarget, reveal, savePoster, scan,
+} from "./api";
 import { darkTheme, lightTheme } from "./theme";
-import type { CleanReport, DriveInfo, Finding, ScanResult, Selection, Tier } from "./types";
+import type { CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, Tier, UpdateInfo } from "./types";
+
+const AUTO_UPDATE_KEY = "diskbreeze.autoUpdate";
+const autoUpdateOn = () => {
+  try { return localStorage.getItem(AUTO_UPDATE_KEY) !== "off"; } catch { return true; }
+};
 
 type Phase = "idle" | "scanning" | "results" | "confirm" | "cleaning" | "done";
 /** Items the user un-ticked inside a ticked finding, by finding id. */
@@ -54,6 +63,41 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [drive, setDrive] = useState<string>("C:");
+  const [version, setVersion] = useState("");
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [updatePct, setUpdatePct] = useState<number | null | "idle">("idle");
+  const [updateNote, setUpdateNote] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(!inTauri && new URLSearchParams(location.search).has("history"));
+  const [autoUpdate, setAutoUpdate] = useState(autoUpdateOn());
+
+  useEffect(() => {
+    appVersion().then(setVersion).catch(() => {});
+    if (autoUpdate) checkForUpdate().then(setUpdate);
+    // Only look once at startup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function checkNow() {
+    setUpdateNote("Checking…");
+    const u = await checkForUpdate();
+    setUpdate(u);
+    setUpdateNote(u ? null : "You're on the latest version.");
+  }
+
+  async function installNow() {
+    setUpdatePct(null);
+    try {
+      await installUpdate(setUpdatePct);
+    } catch (e) {
+      setUpdatePct("idle");
+      setError(`The update didn't install: ${e}`);
+    }
+  }
+
+  function toggleAutoUpdate(on: boolean) {
+    setAutoUpdate(on);
+    try { localStorage.setItem(AUTO_UPDATE_KEY, on ? "on" : "off"); } catch { /* private mode: just keep it for this session */ }
+  }
 
   // Offer every local drive; default to the one holding the user's profile.
   useEffect(() => {
@@ -171,16 +215,38 @@ export default function App() {
       <div className="app">
         <header className="bar">
           <div className="brand"><img className="mark" src="/logo.svg" alt="" width={24} height={24} />{APP_NAME}</div>
-          {phase === "results" && (
-            <div className="bar-actions">
-              {drives.length > 1 && <DriveSwitcher drives={drives} value={drive} onPick={(d) => startScan(d)} />}
-              <Button appearance="subtle" icon={<ArrowSync20Regular />} onClick={() => startScan()}>Scan again</Button>
-            </div>
-          )}
+          <div className="bar-actions">
+            {phase === "results" && drives.length > 1 && <DriveSwitcher drives={drives} value={drive} onPick={(d) => startScan(d)} />}
+            {phase === "results" && <Button appearance="subtle" icon={<ArrowSync20Regular />} onClick={() => startScan()}>Scan again</Button>}
+            <Button appearance="subtle" icon={<History20Regular />} onClick={() => setShowHistory(true)}>History</Button>
+          </div>
         </header>
+        {update && (
+          <MessageBar intent="info" className="gutter" layout="multiline">
+            <MessageBarBody>
+              <b>DiskBreeze {update.version} is available.</b>{update.notes ? ` ${update.notes}` : ""}
+              {updatePct !== "idle" && <ProgressBar className="gap-top" value={updatePct === null ? undefined : updatePct / 100} />}
+            </MessageBarBody>
+            {updatePct === "idle" && (
+              <MessageBarActions>
+                <Button appearance="primary" icon={<ArrowDownload20Regular />} onClick={installNow}>Install and restart</Button>
+                <Button appearance="transparent" onClick={() => setUpdate(null)}>Not now</Button>
+              </MessageBarActions>
+            )}
+          </MessageBar>
+        )}
         {error && <MessageBar intent="error" className="gutter"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
 
         {phase === "idle" && <Landing drives={drives} drive={drive} onPick={setDrive} onScan={() => startScan()} />}
+        {phase === "idle" && (
+          <footer className="about">
+            <Caption1 className="muted">{APP_NAME} {version && `v${version}`}</Caption1>
+            <Button appearance="transparent" size="small" onClick={checkNow}>Check for updates</Button>
+            {updateNote && <Caption1 className="muted">{updateNote}</Caption1>}
+            <Checkbox size="medium" checked={autoUpdate} onChange={(_, d) => toggleAutoUpdate(!!d.checked)} label="Check on startup" />
+          </footer>
+        )}
+        {showHistory && <HistoryDialog onClose={() => setShowHistory(false)} />}
         {phase === "scanning" && <Busy label={progress || "Starting…"} />}
         {phase === "cleaning" && <Busy label="Cleaning… this can take a minute for big folders." />}
         {showResults && (
@@ -209,6 +275,64 @@ export default function App() {
         {phase === "done" && report && result && <Done report={report} result={result} onAgain={() => startScan()} />}
       </div>
     </FluentProvider>
+  );
+}
+
+function HistoryDialog({ onClose }: { onClose: () => void }) {
+  const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
+  useEffect(() => { getHistory().then(setEntries).catch(() => setEntries([])); }, []);
+  const freed = (e: HistoryEntry) => e.outcomes.filter((o) => o.ok && !o.recycled).reduce((s, o) => s + o.bytes, 0);
+  const copy = async (e: HistoryEntry, i: number) => {
+    try { await navigator.clipboard.writeText(historyReport(e)); setCopied(i); setTimeout(() => setCopied(null), 1800); } catch { /* clipboard blocked */ }
+  };
+  return (
+    <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
+      <DialogSurface className="history-surface">
+        <DialogBody>
+          <DialogTitle>Cleanup history</DialogTitle>
+          <DialogContent>
+            <Caption1 className="muted">A log of every cleanup, kept only on this computer.</Caption1>
+            {entries === null && <Spinner size="small" />}
+            {entries?.length === 0 && <Body1 className="gap-top">Nothing cleaned yet. After your first cleanup, it shows up here.</Body1>}
+            <div className="history-list">
+              {entries?.map((e, i) => (
+                <details key={e.when + i} className="history-entry">
+                  <summary>
+                    <span className="h-when">{new Date(e.when).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
+                    <span className="muted h-drive">{e.drive}</span>
+                    <span className="h-freed">{fmt(freed(e))} freed</span>
+                    {e.outcomes.some((o) => !o.ok) && <Badge appearance="tint" color="warning" size="small">problems</Badge>}
+                  </summary>
+                  <ul className="h-outcomes">
+                    {e.outcomes.map((o, j) => (
+                      <li key={j}>
+                        <span className={o.ok ? "ok" : "bad"}>{o.ok ? <CheckmarkCircle20Filled /> : <DismissCircle20Filled />}</span>
+                        <div className="c-name">
+                          <Text weight="semibold">{o.name}</Text>
+                          {o.message && <Caption1 className="err">{o.message}</Caption1>}
+                          {o.recycled && <Caption1 className="muted">Moved to the Recycle Bin</Caption1>}
+                          {o.paths.length > 0 && <Caption1 className="muted h-path" title={o.paths.join("\n")}>{o.paths.length === 1 ? o.paths[0] : `${o.paths[0]} and ${o.paths.length - 1} more`}</Caption1>}
+                        </div>
+                        {o.ok && <Text weight="semibold">{fmt(o.bytes)}</Text>}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="h-actions">
+                    <Button size="small" appearance="subtle" icon={<Copy20Regular />} onClick={() => copy(e, i)}>{copied === i ? "Copied" : "Copy report"}</Button>
+                    <Caption1 className="muted">DiskBreeze {e.appVersion} · {fmtGB(e.freeBefore)} → {fmtGB(e.freeAfter)} free</Caption1>
+                  </div>
+                </details>
+              ))}
+            </div>
+          </DialogContent>
+          <DialogActions>
+            <Button appearance="secondary" onClick={() => openHistoryFolder()}>Open log folder</Button>
+            <Button appearance="primary" onClick={onClose}>Close</Button>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
   );
 }
 

@@ -1,6 +1,7 @@
 mod catalog;
 mod clean;
 mod detect;
+mod history;
 mod model;
 mod paths;
 mod scan;
@@ -23,6 +24,19 @@ struct AppState {
 #[tauri::command]
 fn list_drives() -> Vec<DriveInfo> {
     scan::list_drives()
+}
+
+#[tauri::command]
+fn get_history(limit: Option<usize>) -> Vec<history::HistoryEntry> {
+    history::load(limit.unwrap_or(50).min(300))
+}
+
+/// Opens the folder that holds the log, so people can attach it to a bug report.
+#[tauri::command]
+fn open_history_folder() -> Result<(), String> {
+    let dir = history::dir().ok_or("No data folder")?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Command::new("explorer").arg(dir).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -77,7 +91,10 @@ async fn clean(selections: Vec<Selection>, state: State<'_, AppState>) -> Result
         let before = scan::disk_info(&drive);
         let refs: Vec<&Finding> = selected.iter().collect();
         let outcomes = clean::run(&refs);
-        CleanReport { before, after: scan::disk_info(&drive), outcomes }
+        let after = scan::disk_info(&drive);
+        // Logging must never get in the way of the clean itself.
+        let _ = history::append(&history::entry_from(&drive, &before, &after, &outcomes));
+        CleanReport { before, after, outcomes }
     })
     .await
     .map_err(|e| e.to_string())
@@ -129,7 +146,9 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![list_drives, scan, clean, open_target, reveal, save_poster])
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .invoke_handler(tauri::generate_handler![list_drives, get_history, open_history_folder, scan, clean, open_target, reveal, save_poster])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

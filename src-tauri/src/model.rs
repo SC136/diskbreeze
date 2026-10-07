@@ -178,10 +178,14 @@ pub struct ScanResult {
 #[serde(rename_all = "camelCase")]
 pub struct CleanOutcome {
     pub id: String,
+    pub name: String,
     pub ok: bool,
     pub bytes: u64,
     pub recycled: bool,
     pub message: Option<String>,
+    /// What was touched. Goes to the local history log, not to the UI.
+    #[serde(skip)]
+    pub paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

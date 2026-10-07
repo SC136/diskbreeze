@@ -24,7 +24,7 @@ Get the Windows installer from the [releases page](https://github.com/SC136/disk
 3. **Cleans** what you tick after a confirm screen. Personal files go to the Recycle Bin. Caches are deleted for good because they rebuild themselves.
 4. **Shows a share card** with your before/after numbers.
 
-No AI and no network access: everything is rules in the catalog plus a few detectors.
+No AI: everything is rules in the catalog plus a few detectors. The only network request the app makes is an update check against GitHub when it starts (you can turn it off on the start screen); nothing about your files ever leaves your computer.
 
 ## Design
 

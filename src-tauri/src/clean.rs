@@ -13,7 +13,11 @@ pub fn run(findings: &[&Finding]) -> Vec<CleanOutcome> {
 }
 
 fn clean_one(f: &Finding) -> CleanOutcome {
-    let targets = targets_of(&f.plan);
+    let mut targets = targets_of(&f.plan);
+    if targets.is_empty() && matches!(f.plan, Plan::Command { .. }) {
+        // A tool cleans its own folders (npm, pnpm…): measure the folders we listed for it.
+        targets = f.items.iter().map(|i| PathBuf::from(&i.path)).collect();
+    }
     let before: u64 = targets.iter().map(|p| size::size_of(p)).sum();
     let result = execute(&f.plan);
     let after: u64 = targets.iter().map(|p| size::size_of(p)).sum();
@@ -21,9 +25,15 @@ fn clean_one(f: &Finding) -> CleanOutcome {
         Plan::EmptyRecycleBin(_) => f.bytes,
         _ => before.saturating_sub(after),
     };
+    let paths: Vec<String> = if targets.is_empty() {
+        f.items.iter().map(|i| i.path.clone()).collect()
+    } else {
+        targets.iter().map(|p| p.to_string_lossy().into_owned()).collect()
+    };
+    let (id, name) = (f.id.clone(), f.name.clone());
     match result {
-        Ok(()) => CleanOutcome { id: f.id.clone(), ok: true, bytes: freed, recycled: f.plan.recycles(), message: None },
-        Err(e) => CleanOutcome { id: f.id.clone(), ok: false, bytes: freed, recycled: false, message: Some(e) },
+        Ok(()) => CleanOutcome { id, name, ok: true, bytes: freed, recycled: f.plan.recycles(), message: None, paths },
+        Err(e) => CleanOutcome { id, name, ok: false, bytes: freed, recycled: false, message: Some(e), paths },
     }
 }
 

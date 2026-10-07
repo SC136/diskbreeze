@@ -158,3 +158,21 @@ html, body, #root { height: 100%; margin: 0; }
 /* Nothing found on a drive */
 .empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 48px 24px; max-width: 520px; margin: 0 auto; }
 .empty-icon { width: 44px; height: 44px; color: var(--colorPaletteGreenForeground1); }
+
+/* About line (landing), update banner and history dialog */
+.about { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 10px 20px 14px; flex-wrap: wrap; }
+.history-surface { max-width: 640px; width: 92vw; }
+.history-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-height: 56vh; overflow-y: auto; }
+.history-entry { border: 1px solid var(--colorNeutralStroke2); border-radius: var(--borderRadiusLarge); background: var(--colorNeutralBackground1); }
+.history-entry summary { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.history-entry summary::-webkit-details-marker { display: none; }
+.history-entry[open] summary { border-bottom: 1px solid var(--colorNeutralStroke2); }
+.h-when { font-weight: 600; flex: 1; }
+.h-freed { font-weight: 600; }
+.h-outcomes { list-style: none; margin: 0; padding: 4px 14px; }
+.h-outcomes li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--colorNeutralStroke2); }
+.h-outcomes li:last-child { border-bottom: 0; }
+.h-outcomes .ok { color: var(--colorPaletteGreenForeground1); display: flex; }
+.h-outcomes .bad { color: var(--colorPaletteRedForeground1); display: flex; }
+.h-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
+.h-actions { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px 10px 8px; }

@@ -1,4 +1,4 @@
-import type { CleanReport, DriveInfo, Finding, ScanResult, Selection } from "./types";
+import type { CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, UpdateInfo } from "./types";
 
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;
@@ -113,8 +113,83 @@ export async function clean(selections: Selection[]): Promise<CleanReport> {
   return {
     before: mockDisk,
     after: { ...mockDisk, free: mockDisk.free + freed },
-    outcomes: rows.map((r) => ({ id: r.x.id, ok: true, bytes: r.bytes, recycled: r.x.recycles, message: null })),
+    outcomes: rows.map((r) => ({ id: r.x.id, name: r.x.name, ok: true, bytes: r.bytes, recycled: r.x.recycles, message: null })),
   };
+}
+
+export async function appVersion(): Promise<string> {
+  if (inTauri) {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    return getVersion();
+  }
+  return "0.2.1";
+}
+
+export async function getHistory(): Promise<HistoryEntry[]> {
+  if (inTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<HistoryEntry[]>("get_history", { limit: 50 });
+  }
+  const outcomes = [
+    { name: "npm cache", ok: true, bytes: 2.9 * GB, recycled: false, message: null, paths: ["C:\\Users\\you\\AppData\\Local\\npm-cache"] },
+    { name: "Gradle caches", ok: true, bytes: 16.3 * GB, recycled: false, message: null, paths: ["C:\\Users\\you\\.gradle\\caches"] },
+    { name: "Disk images (ISO files)", ok: true, bytes: 6.6 * GB, recycled: true, message: null, paths: ["C:\\Users\\you\\Downloads\\Windows.iso"] },
+    { name: "Docker unused data", ok: false, bytes: 0, recycled: false, message: "docker isn't running", paths: [] },
+  ].map((o) => ({ ...o, bytes: Math.round(o.bytes) }));
+  return [
+    { when: "2026-10-06T20:15:30", drive: "C:", appVersion: "0.2.1", freeBefore: 56.6 * GB, freeAfter: 75.8 * GB, outcomes },
+    { when: "2026-10-02T11:02:10", drive: "C:", appVersion: "0.1.0", freeBefore: 40 * GB, freeAfter: 41 * GB, outcomes: outcomes.slice(0, 1) },
+  ];
+}
+
+export async function openHistoryFolder() {
+  if (inTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("open_history_folder");
+  }
+}
+
+/** A plain-text report of one cleanup, ready to paste into a bug report. */
+export function historyReport(e: HistoryEntry): string {
+  const lines = [
+    `DiskBreeze ${e.appVersion} cleanup on ${e.drive} at ${e.when.replace("T", " ")}`,
+    `Free space: ${fmtGB(e.freeBefore)} -> ${fmtGB(e.freeAfter)}`,
+    ...e.outcomes.map((o) => `- ${o.ok ? "OK  " : "FAIL"} ${o.name}: ${fmt(o.bytes)}${o.recycled ? " (to Recycle Bin)" : ""}${o.message ? ` [${o.message}]` : ""}`),
+  ];
+  return lines.join("\n");
+}
+
+let pendingUpdate: { downloadAndInstall: (cb: (ev: { event: string; data?: { contentLength?: number; chunkLength?: number } }) => void) => Promise<void> } | null = null;
+
+/** Ask GitHub whether a newer version exists. Returns null when up to date. Never throws. */
+export async function checkForUpdate(): Promise<UpdateInfo | null> {
+  try {
+    if (!inTauri) {
+      return new URLSearchParams(location.search).get("update") ? { version: "0.3.0", notes: "Admin-level Windows cleanup, Docker/WSL and OneDrive." } : null;
+    }
+    const { check } = await import("@tauri-apps/plugin-updater");
+    const update = await check();
+    if (!update) return null;
+    pendingUpdate = update;
+    return { version: update.version, notes: update.body ?? null };
+  } catch {
+    return null; // offline or no release yet: stay quiet
+  }
+}
+
+/** Download and install the update found by checkForUpdate, then restart. */
+export async function installUpdate(onProgress: (pct: number | null) => void): Promise<void> {
+  if (!inTauri || !pendingUpdate) {
+    for (let i = 0; i <= 10; i++) { onProgress(i * 10); await sleep(150); }
+    return;
+  }
+  let total = 0, done = 0;
+  await pendingUpdate.downloadAndInstall((ev) => {
+    if (ev.event === "Started") total = ev.data?.contentLength ?? 0;
+    if (ev.event === "Progress") { done += ev.data?.chunkLength ?? 0; onProgress(total ? Math.min(100, Math.round((done / total) * 100)) : null); }
+  });
+  const { relaunch } = await import("@tauri-apps/plugin-process");
+  await relaunch();
 }
 
 export async function openTarget(target: string) {
