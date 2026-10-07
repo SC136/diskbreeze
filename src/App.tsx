@@ -220,7 +220,10 @@ export default function App() {
   const showResults = (phase === "results" || phase === "confirm") && result;
 
   return (
-    <FluentProvider theme={dark ? darkTheme : lightTheme} className="shell">
+    // No className on the provider: Fluent copies it onto the hidden wrapper it creates for pop-ups
+    // (dropdown lists, dialogs), and our full-window `.shell` background would then cover the app.
+    <FluentProvider theme={dark ? darkTheme : lightTheme}>
+      <div className="shell">
       <div className="app">
         <header className="bar">
           <div className="brand"><img className="mark" src="/logo.svg" alt="" width={24} height={24} />{APP_NAME}</div>
@@ -283,6 +286,7 @@ export default function App() {
           <Confirm chosen={chosen} excluded={excluded} bytes={chosenBytes} onCancel={() => setPhase("results")} onGo={runClean} />
         )}
         {phase === "done" && report && result && <Done report={report} result={result} onAgain={() => startScan()} />}
+      </div>
       </div>
     </FluentProvider>
   );

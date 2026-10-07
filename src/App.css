@@ -1,4 +1,6 @@
 html, body, #root { height: 100%; margin: 0; }
+/* Only the app's own provider root: Fluent's pop-up wrappers (outside #root) must not get full-window sizing. */
+#root > .fui-FluentProvider { height: 100%; }
 .shell { height: 100%; background: var(--colorNeutralBackground2); color: var(--colorNeutralForeground1); }
 .app { height: 100%; display: flex; flex-direction: column; }
 .muted { color: var(--colorNeutralForeground3); }
