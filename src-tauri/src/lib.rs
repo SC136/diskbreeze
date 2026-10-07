@@ -122,6 +122,10 @@ fn open_target(target: String) -> Result<(), String> {
     if t == "run:cleanmgr" {
         return Command::new("cleanmgr").spawn().map(|_| ()).map_err(|e| e.to_string());
     }
+    // Only this project's own release pages: the update banner's "What's new" link.
+    if t.starts_with("https://github.com/SC136/diskbreeze/") && !t.contains(['"', ' ', '^', '&', '|', '<', '>']) {
+        return Command::new("explorer").arg(t).spawn().map(|_| ()).map_err(|e| e.to_string());
+    }
     if ["steam://", "shell:", "ms-settings:"].iter().any(|p| t.starts_with(p)) {
         return Command::new("explorer").arg(t).spawn().map(|_| ()).map_err(|e| e.to_string());
     }

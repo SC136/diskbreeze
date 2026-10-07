@@ -159,6 +159,13 @@ export async function openHistoryFolder() {
   }
 }
 
+/** The first line of release notes, without markdown: "**New: x**" -> "New: x". */
+export function shortNotes(notes: string | null): string {
+  const first = (notes ?? "").split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
+  const clean = first.replace(/^[#>\-*\s]+/, "").replace(/[*_`]/g, "").trim();
+  return clean.length > 140 ? `${clean.slice(0, 137)}…` : clean;
+}
+
 /** A plain-text report of one cleanup, ready to paste into a bug report. */
 export function historyReport(e: HistoryEntry): string {
   const lines = [
@@ -175,7 +182,9 @@ let pendingUpdate: { downloadAndInstall: (cb: (ev: { event: string; data?: { con
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   try {
     if (!inTauri) {
-      return new URLSearchParams(location.search).get("update") ? { version: "0.3.0", notes: "Admin-level Windows cleanup, Docker/WSL and OneDrive." } : null;
+      return new URLSearchParams(location.search).get("update")
+        ? { version: "0.3.1", notes: "**Fixes and polish**\n- A tidier update banner.\n- Your history log now lives in the app's data folder.\n\n**Install:** run the setup file." }
+        : null;
     }
     const { check } = await import("@tauri-apps/plugin-updater");
     const update = await check();

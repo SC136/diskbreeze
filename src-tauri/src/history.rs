@@ -34,12 +34,39 @@ pub struct HistoryEntry {
     pub outcomes: Vec<HistoryOutcome>,
 }
 
+/// The app's own data folder (named after its identifier, like the rest of its data). It must
+/// not be the install folder: uninstalling or updating the app owns that one.
 pub fn dir() -> Option<PathBuf> {
+    dirs::data_local_dir().map(|d| d.join("com.diskbreeze.app"))
+}
+
+/// Where 0.2.1 and 0.3.0 kept the log: inside the install folder.
+fn legacy_dir() -> Option<PathBuf> {
     dirs::data_local_dir().map(|d| d.join("DiskBreeze"))
 }
 
 fn file() -> Option<PathBuf> {
+    migrate_legacy();
     dir().map(|d| d.join("history.jsonl"))
+}
+
+/// One-time move of the log from the old location. Never overwrites a newer log.
+fn migrate_legacy() {
+    if let (Some(old), Some(new)) = (legacy_dir(), dir()) {
+        let _ = migrate(&old.join("history.jsonl"), &new.join("history.jsonl"));
+    }
+}
+
+fn migrate(old: &std::path::Path, new: &std::path::Path) -> std::io::Result<()> {
+    if !old.is_file() || new.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = new.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    // Copy first and only then remove the original, so a failure never loses the log.
+    fs::copy(old, new)?;
+    fs::remove_file(old)
 }
 
 pub fn entry_from(drive: &str, before: &DiskInfo, after: &DiskInfo, outcomes: &[CleanOutcome]) -> HistoryEntry {
@@ -109,6 +136,22 @@ mod tests {
             message: None,
             paths: (0..100).map(|i| format!(r"C:\a\{i}")).collect(),
         }
+    }
+
+    #[test]
+    fn migrates_once_and_never_overwrites() {
+        let d = tempfile::tempdir().unwrap();
+        let old = d.path().join("DiskBreeze").join("history.jsonl");
+        let new = d.path().join("com.diskbreeze.app").join("history.jsonl");
+        fs::create_dir_all(old.parent().unwrap()).unwrap();
+        fs::write(&old, "old log\n").unwrap();
+        migrate(&old, &new).unwrap();
+        assert_eq!(fs::read_to_string(&new).unwrap(), "old log\n");
+        assert!(!old.exists(), "the original is removed after a successful copy");
+        // A later, newer log at the old path must not clobber the new one.
+        fs::write(&old, "stale\n").unwrap();
+        migrate(&old, &new).unwrap();
+        assert_eq!(fs::read_to_string(&new).unwrap(), "old log\n");
     }
 
     #[test]

@@ -12,7 +12,7 @@ import { toPng } from "html-to-image";
 import { APP_NAME, freedBytes, Poster, type CleanedRow } from "./Poster";
 import {
   appVersion, checkForUpdate, clean, fmt, fmtGB, fmtParts, getHistory, historyReport, inTauri, installUpdate, listDrives,
-  openHistoryFolder, openTarget, reveal, savePoster, scan,
+  openHistoryFolder, openTarget, reveal, savePoster, scan, shortNotes,
 } from "./api";
 import { darkTheme, lightTheme } from "./theme";
 import type { CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, Tier, UpdateInfo } from "./types";
@@ -231,12 +231,13 @@ export default function App() {
         {update && (
           <MessageBar intent="info" className="gutter" layout="multiline">
             <MessageBarBody>
-              <b>DiskBreeze {update.version} is available.</b>{update.notes ? ` ${update.notes}` : ""}
+              <b>DiskBreeze {update.version} is available.</b>{shortNotes(update.notes) && ` ${shortNotes(update.notes)}`}
               {updatePct !== "idle" && <ProgressBar className="gap-top" value={updatePct === null ? undefined : updatePct / 100} />}
             </MessageBarBody>
             {updatePct === "idle" && (
               <MessageBarActions>
                 <Button appearance="primary" icon={<ArrowDownload20Regular />} onClick={installNow}>Install and restart</Button>
+                <Button appearance="secondary" onClick={() => openTarget(`https://github.com/SC136/diskbreeze/releases/tag/v${update.version}`)}>What's new</Button>
                 <Button appearance="transparent" onClick={() => setUpdate(null)}>Not now</Button>
               </MessageBarActions>
             )}
