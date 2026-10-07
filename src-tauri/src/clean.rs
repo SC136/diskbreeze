@@ -28,9 +28,13 @@ fn clean_one(f: &Finding) -> CleanOutcome {
     let before: u64 = targets.iter().map(|p| size::size_of(p)).sum();
     let result = execute(&f.plan);
     let after: u64 = targets.iter().map(|p| size::size_of(p)).sum();
+    let free_delta = || scan::disk_info(&drive).free.saturating_sub(free_before);
     let mut freed = match &f.plan {
         Plan::EmptyRecycleBin(_) => f.bytes,
-        _ if by_free_space => scan::disk_info(&drive).free.saturating_sub(free_before),
+        _ if by_free_space => free_delta(),
+        // System files can share disk space with other files (hard links, compression), so what
+        // they add up to can be more than the drive gets back. Claim only what was gained.
+        Plan::Admin { .. } => reconcile(before.saturating_sub(after), free_delta()),
         _ => before.saturating_sub(after),
     };
     // WSL disk files are compacted by diskpart; free space is the honest measure there too.
@@ -55,6 +59,12 @@ fn clean_one(f: &Finding) -> CleanOutcome {
         Ok(()) => CleanOutcome { id, name, ok: true, bytes: freed, recycled: f.plan.recycles(), message: note, paths },
         Err(e) => CleanOutcome { id, name, ok: false, bytes: freed, recycled: false, message: Some(e), paths },
     }
+}
+
+/// How much to claim as freed: never more than the files added up to, and never more than the
+/// drive's free space actually grew by.
+fn reconcile(files_removed: u64, free_space_gained: u64) -> u64 {
+    files_removed.min(free_space_gained)
 }
 
 fn targets_of(plan: &Plan) -> Vec<PathBuf> {
@@ -165,6 +175,15 @@ fn run_command(cmd: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn claims_only_what_the_drive_really_gained() {
+        // The real case: 7.4 GB of update files removed, free space grew by 2.4 GB.
+        let gb = 1024u64 * 1024 * 1024;
+        assert_eq!(reconcile(7 * gb + gb * 2 / 5, 2 * gb + gb * 2 / 5), 2 * gb + gb * 2 / 5);
+        assert_eq!(reconcile(gb, 5 * gb), gb, "other deletions can't inflate it");
+        assert_eq!(reconcile(gb, 0), 0);
+    }
 
     #[test]
     fn empties_contents_but_keeps_folder() {

@@ -36,6 +36,9 @@ pub struct Entry {
     /// The saving can't be measured up front (e.g. the Windows component store): show "varies".
     #[serde(default)]
     pub size_unknown: bool,
+    /// The listed size is an upper bound (files can share disk space): show "up to".
+    #[serde(default)]
+    pub estimate: bool,
     #[serde(default)]
     pub min_age_days: u32,
     #[serde(default = "default_min_mb")]
@@ -159,7 +162,7 @@ fn resolve(e: &Entry) -> Option<Finding> {
         open: e.open.clone(),
         bytes,
         selectable: plan.itemizable() && items.len() > 1,
-        estimate: e.size_unknown,
+        estimate: e.size_unknown || e.estimate,
         items,
         recycles: plan.recycles(),
         action: plan.summary(),
