@@ -154,3 +154,7 @@ html, body, #root { height: 100%; margin: 0; }
 .drive-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .drive-letter { font-size: 20px; font-weight: 700; }
 .drive-label { flex: 1; min-width: 0; color: var(--colorNeutralForeground2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Nothing found on a drive */
+.empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 48px 24px; max-width: 520px; margin: 0 auto; }
+.empty-icon { width: 44px; height: 44px; color: var(--colorPaletteGreenForeground1); }

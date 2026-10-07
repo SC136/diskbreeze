@@ -14,13 +14,22 @@ use std::sync::Mutex;
 const MAX_DEPTH: usize = 7;
 const SKIP: &[&str] = &[".git", "node_modules", "steamapps", "$recycle.bin", "system volume information"];
 const KINDS: &[&str] = &[
-    "iso", "img", "dmg", "wim", "esd", "zip", "rar", "7z", "tar", "gz", "tgz", "xz", "bz2", "mkv", "mp4",
+    "iso", "img", "dmg", "zip", "rar", "7z", "tar", "gz", "tgz", "xz", "bz2", "mkv", "mp4",
     "avi", "mov", "wmv", "m4v", "vhd", "vhdx", "vmdk", "ova", "bak", "backup",
 ];
 
 pub fn detect(drive: &str) -> Option<Finding> {
-    let found = scan(Path::new(&format!("{drive}\\")), GB, 90);
-    make(found)
+    let root = PathBuf::from(format!("{drive}\\"));
+    if is_boot_media(&root) {
+        return None;
+    }
+    make(scan(&root, GB, 90))
+}
+
+/// Windows installers and other bootable sticks: their big files (install.wim, images)
+/// are what make them work, so they are never offered for cleanup.
+fn is_boot_media(root: &Path) -> bool {
+    root.join("bootmgr").exists() || root.join("bootmgr.efi").exists() || root.join(r"efi\boot").exists()
 }
 
 struct Big {
@@ -110,6 +119,17 @@ mod tests {
         let f = fs::File::create(path).unwrap();
         f.set_len(len).unwrap();
         f.set_modified(SystemTime::now() - Duration::from_secs(days * 86_400)).unwrap();
+    }
+
+    #[test]
+    fn bootable_media_is_left_alone() {
+        let d = tempfile::tempdir().unwrap();
+        assert!(!is_boot_media(d.path()));
+        fs::write(d.path().join("bootmgr"), "x").unwrap();
+        assert!(is_boot_media(d.path()));
+        let e = tempfile::tempdir().unwrap();
+        fs::create_dir_all(e.path().join("efi/boot")).unwrap();
+        assert!(is_boot_media(e.path()));
     }
 
     #[test]

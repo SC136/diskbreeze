@@ -185,11 +185,11 @@ export default function App() {
         {phase === "cleaning" && <Busy label="Cleaning… this can take a minute for big folders." />}
         {showResults && (
           <Results
-            result={result} checked={checked} excluded={excluded}
+            result={result} info={drives.find((d) => d.letter === drive)} checked={checked} excluded={excluded}
             onFinding={toggleFinding} onItem={toggleItem} onTier={setTier}
           />
         )}
-        {showResults && (
+        {showResults && result.findings.length > 0 && (
           <footer className="dock">
             <div className="dock-sum">
               <span className="dock-num">{fmt(chosenBytes)}</span>
@@ -296,11 +296,11 @@ function Ring({ pct }: { pct: number }) {
 }
 
 interface ResultsProps {
-  result: ScanResult; checked: Set<string>; excluded: Excluded;
+  result: ScanResult; info?: DriveInfo; checked: Set<string>; excluded: Excluded;
   onFinding: (f: Finding) => void; onItem: (f: Finding, path: string) => void; onTier: (t: Tier, on: boolean) => void;
 }
 
-function Results({ result, checked, excluded, onFinding, onItem, onTier }: ResultsProps) {
+function Results({ result, info, checked, excluded, onFinding, onItem, onTier }: ResultsProps) {
   const { disk } = result;
   const used = (disk.total - disk.free) / disk.total;
   const reclaimable = result.findings.filter((f) => f.tier !== "manual").reduce((s, f) => s + f.bytes, 0);
@@ -314,19 +314,42 @@ function Results({ result, checked, excluded, onFinding, onItem, onTier }: Resul
   const current = TIERS.find((t) => t.tier === tab)!;
   const allOn = list.length > 0 && list.every((f) => checked.has(f.id));
 
-  return (
-    <main className="results">
-      <section className="hero">
-        <Ring pct={used} />
-        <div className="hero-text">
-          <Caption1 className="muted">Drive {disk.mount.replace("\\", "")}</Caption1>
-          <div><span className="hero-free">{fmt(disk.free)}</span><Body1 className="muted"> free of {fmt(disk.total)}</Body1></div>
+  const hero = (
+    <section className="hero">
+      <Ring pct={used} />
+      <div className="hero-text">
+        <Caption1 className="muted">Drive {disk.mount.replace("\\", "")}</Caption1>
+        <div><span className="hero-free">{fmt(disk.free)}</span><Body1 className="muted"> free of {fmt(disk.total)}</Body1></div>
+        {result.findings.length > 0 && (
           <Body1>
             Up to <b>{fmt(reclaimable)}</b> can be cleaned.
             {result.staleProjects > 0 && <> Build files in <b>{result.staleProjects}</b> old projects were found; <b>{result.activeProjects}</b> active ones were left alone.</>}
           </Body1>
+        )}
+      </div>
+    </section>
+  );
+
+  if (result.findings.length === 0) {
+    return (
+      <main className="results">
+        {hero}
+        <div className="empty">
+          <CheckmarkCircle20Filled className="empty-icon" />
+          <Subtitle2 as="h2">Nothing to clean on this drive</Subtitle2>
+          <Body1 className="muted">
+            {info?.removable
+              ? "This looks like a storage or installer drive. DiskBreeze found no old projects, big loose files or leftovers here, and it leaves bootable media alone."
+              : "DiskBreeze found no old projects, big loose files or leftovers here."}
+          </Body1>
         </div>
-      </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="results">
+      {hero}
 
       <TabList selectedValue={tab} onTabSelect={(_, d) => { setTab(d.value as Tier); setOpen(null); }} size="large" className="tabs">
         {tiers.map((t) => {
