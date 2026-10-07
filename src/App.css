@@ -28,7 +28,7 @@ html, body, #root { height: 100%; margin: 0; }
 *::-webkit-scrollbar-corner { background: transparent; }
 
 .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 40px; text-align: center; }
-.center h1 { max-width: 18ch; margin: 0; }
+.center h1 { max-width: 18ch; margin: 0; text-align: center; }
 .lead { max-width: 54ch; color: var(--colorNeutralForeground2); }
 
 .free { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 10px; }
@@ -143,3 +143,14 @@ html, body, #root { height: 100%; margin: 0; }
 .stat-row { display: flex; gap: 28px; margin: 2px 0 4px; }
 .stat { display: flex; flex-direction: column; }
 .stat b { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+
+/* Drive picker (landing) and switcher (header) */
+.bar-actions { display: flex; align-items: center; gap: 8px; }
+.drive-switch { min-width: 250px; }
+.drives { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; max-width: 760px; }
+.drive { width: 220px; text-align: left; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: var(--borderRadiusXLarge); border: 1px solid var(--colorNeutralStroke2); background: var(--colorNeutralBackground1); color: inherit; font: inherit; cursor: pointer; transition: border-color 0.12s, box-shadow 0.12s; }
+.drive:hover { box-shadow: var(--shadow4); }
+.drive.on { border-color: var(--colorBrandStroke1); box-shadow: 0 0 0 1px var(--colorBrandStroke1); }
+.drive-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.drive-letter { font-size: 20px; font-weight: 700; }
+.drive-label { flex: 1; min-width: 0; color: var(--colorNeutralForeground2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

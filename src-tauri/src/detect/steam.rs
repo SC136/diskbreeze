@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub fn detect() -> Option<Finding> {
+pub fn detect(drive: &str) -> Option<Finding> {
     let root = paths::steam_root()?;
     let mut games = vec![];
     for lib in libraries(&root) {
@@ -25,7 +25,8 @@ pub fn detect() -> Option<Finding> {
             }
         }
     }
-    games.retain(|g: &Item| g.bytes >= 2 * GB);
+    // Only games installed on the drive being scanned (libraries can live on any drive).
+    games.retain(|g: &Item| g.bytes >= 2 * GB && paths::on_drive(Path::new(&g.path), drive));
     if games.is_empty() {
         return None;
     }

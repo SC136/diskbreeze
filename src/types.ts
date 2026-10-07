@@ -36,6 +36,18 @@ export interface DiskInfo {
   free: number;
 }
 
+/** A drive the user can choose to scan. */
+export interface DriveInfo {
+  /** "C:" */
+  letter: string;
+  label: string;
+  total: number;
+  free: number;
+  removable: boolean;
+  /** Holds the user's profile, so app caches and Downloads live here. */
+  hasProfile: boolean;
+}
+
 export interface ScanResult {
   disk: DiskInfo;
   findings: Finding[];

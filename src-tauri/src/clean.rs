@@ -8,7 +8,7 @@ use std::process::Command;
 /// moved there are emptied too only if the user selected it.
 pub fn run(findings: &[&Finding]) -> Vec<CleanOutcome> {
     let mut ordered: Vec<&Finding> = findings.to_vec();
-    ordered.sort_by_key(|f| matches!(f.plan, Plan::EmptyRecycleBin));
+    ordered.sort_by_key(|f| matches!(f.plan, Plan::EmptyRecycleBin(_)));
     ordered.iter().map(|f| clean_one(f)).collect()
 }
 
@@ -18,7 +18,7 @@ fn clean_one(f: &Finding) -> CleanOutcome {
     let result = execute(&f.plan);
     let after: u64 = targets.iter().map(|p| size::size_of(p)).sum();
     let freed = match &f.plan {
-        Plan::EmptyRecycleBin => f.bytes,
+        Plan::EmptyRecycleBin(_) => f.bytes,
         _ => before.saturating_sub(after),
     };
     match result {
@@ -65,8 +65,13 @@ fn execute(plan: &Plan) -> Result<(), String> {
                 None => Err(e),
             },
         },
-        Plan::EmptyRecycleBin => {
-            let items = trash::os_limited::list().map_err(|e| e.to_string())?;
+        Plan::EmptyRecycleBin(drive) => {
+            // The bin lists items from every drive; only purge the ones from this drive.
+            let items: Vec<_> = trash::os_limited::list()
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .filter(|i| paths::on_drive(&i.original_parent, drive))
+                .collect();
             trash::os_limited::purge_all(items).map_err(|e| e.to_string())
         }
         Plan::Manual => Err("This one has to be done by hand".into()),

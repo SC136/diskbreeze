@@ -1,7 +1,16 @@
+pub mod bigfiles;
 pub mod downloads;
 pub mod projects;
 pub mod recycle_bin;
 pub mod steam;
+
+/// Top-level folders (lowercase) that belong to Windows, apps or game launchers. Never searched
+/// for projects or big files on a drive.
+pub const SYSTEM_DIRS: &[&str] = &[
+    "windows", "program files", "program files (x86)", "programdata", "$recycle.bin",
+    "system volume information", "recovery", "$winreagent", "windowsapps", "msocache",
+    "config.msi", "perflogs", "$sysreset", "boot", "steamlibrary", "steamapps", "$windows.~bt", "$windows.~ws",
+];
 
 pub const MB: u64 = 1024 * 1024;
 pub const GB: u64 = 1024 * MB;

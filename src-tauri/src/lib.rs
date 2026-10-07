@@ -7,7 +7,7 @@ mod scan;
 mod size;
 
 use base64::Engine;
-use model::{CleanReport, Finding, Progress, ScanResult, Selection};
+use model::{CleanReport, DriveInfo, Finding, Progress, ScanResult, Selection};
 use std::collections::HashSet;
 use std::process::Command;
 use std::sync::Mutex;
@@ -16,18 +16,31 @@ use tauri::{Emitter, State};
 #[derive(Default)]
 struct AppState {
     findings: Mutex<Vec<Finding>>,
+    /// The drive the current findings came from, e.g. "D:".
+    drive: Mutex<String>,
 }
 
 #[tauri::command]
-async fn scan(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<ScanResult, String> {
+fn list_drives() -> Vec<DriveInfo> {
+    scan::list_drives()
+}
+
+#[tauri::command]
+async fn scan(drive: Option<String>, app: tauri::AppHandle, state: State<'_, AppState>) -> Result<ScanResult, String> {
+    let drive = scan::normalize(&drive.unwrap_or_else(paths::profile_drive));
+    if !scan::list_drives().iter().any(|d| d.letter == drive) {
+        return Err(format!("Drive {drive} isn't available"));
+    }
+    let d = drive.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        scan::run(|stage, detail| {
+        scan::run(&d, |stage, detail| {
             let _ = app.emit("progress", Progress { stage: stage.into(), detail: detail.into() });
         })
     })
     .await
     .map_err(|e| e.to_string())?;
     *state.findings.lock().unwrap() = result.findings.clone();
+    *state.drive.lock().unwrap() = drive;
     Ok(result)
 }
 
@@ -59,11 +72,12 @@ async fn clean(selections: Vec<Selection>, state: State<'_, AppState>) -> Result
         }
         selected.push(f);
     }
+    let drive = state.drive.lock().unwrap().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let before = scan::disk_info();
+        let before = scan::disk_info(&drive);
         let refs: Vec<&Finding> = selected.iter().collect();
         let outcomes = clean::run(&refs);
-        CleanReport { before, after: scan::disk_info(), outcomes }
+        CleanReport { before, after: scan::disk_info(&drive), outcomes }
     })
     .await
     .map_err(|e| e.to_string())
@@ -100,8 +114,14 @@ fn save_poster(png_base64: String) -> Result<String, String> {
 }
 
 /// `diskbreeze --scan-json` prints a scan as JSON; handy for testing and bug reports.
-pub fn scan_json() -> String {
-    serde_json::to_string_pretty(&scan::run(|_, _| {})).unwrap_or_default()
+pub fn scan_json(drive: Option<&str>) -> String {
+    let drive = scan::normalize(drive.unwrap_or(&paths::profile_drive()));
+    serde_json::to_string_pretty(&scan::run(&drive, |_, _| {})).unwrap_or_default()
+}
+
+/// `diskbreeze --list-drives` prints the drives the picker would show.
+pub fn drives_json() -> String {
+    serde_json::to_string_pretty(&scan::list_drives()).unwrap_or_default()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -109,7 +129,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![scan, clean, open_target, reveal, save_poster])
+        .invoke_handler(tauri::generate_handler![list_drives, scan, clean, open_target, reveal, save_poster])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

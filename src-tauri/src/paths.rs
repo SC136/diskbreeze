@@ -110,6 +110,29 @@ pub fn wildcard_match(pattern: &str, text: &str) -> bool {
     p[pi..].iter().all(|&c| c == '*')
 }
 
+/// "D:" for `D:\games\x`, lowercased-insensitively comparable.
+pub fn drive_of(path: &Path) -> Option<String> {
+    match path.components().next() {
+        Some(Component::Prefix(p)) => {
+            let s = p.as_os_str().to_string_lossy();
+            (s.len() >= 2 && s.as_bytes()[1] == b':').then(|| s[..2].to_uppercase())
+        }
+        _ => None,
+    }
+}
+
+pub fn on_drive(path: &Path, drive: &str) -> bool {
+    drive_of(path).is_some_and(|d| d.eq_ignore_ascii_case(drive))
+}
+
+/// Drive that holds the user's profile (usually the system drive).
+pub fn profile_drive() -> String {
+    dirs::home_dir()
+        .and_then(|h| drive_of(&h))
+        .or_else(|| env::var("SystemDrive").ok().map(|d| d.to_uppercase()))
+        .unwrap_or_else(|| "C:".into())
+}
+
 /// Last line of defence before anything is deleted or recycled. Refuses drive
 /// roots, shallow paths, Windows itself, and the user's main folders. Things
 /// *inside* those folders (e.g. one ISO in Downloads) are still allowed.
@@ -118,7 +141,9 @@ pub fn is_protected(path: &Path) -> bool {
         return true;
     }
     let depth = path.components().filter(|c| matches!(c, Component::Normal(_))).count();
-    if depth < 2 {
+    // Drive roots are never touched. A top-level *folder* (D:\Games) is off limits too,
+    // but a single file sitting at a drive root (D:\old.iso) can be offered to the user.
+    if depth == 0 || (depth == 1 && !path.is_file()) {
         return true;
     }
     let lower = path.to_string_lossy().to_lowercase();
@@ -186,6 +211,25 @@ mod tests {
         let mut found = glob(&pattern);
         found.sort();
         assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn knows_which_drive_a_path_is_on() {
+        assert_eq!(drive_of(Path::new(r"d:\games\x")).as_deref(), Some("D:"));
+        assert!(on_drive(Path::new(r"D:\a\b"), "d:"));
+        assert!(!on_drive(Path::new(r"C:\a\b"), "D:"));
+        assert!(!on_drive(Path::new(r"relative\a"), "C:"));
+    }
+
+    #[test]
+    fn top_level_folders_are_protected_but_loose_files_are_not() {
+        let dir = tempfile::tempdir().unwrap();
+        // The temp dir is nested, so check the rule on synthetic root-level paths.
+        assert!(is_protected(Path::new(r"Z:\Games")), "unknown top-level folder stays protected");
+        assert!(is_protected(Path::new(r"Z:\")));
+        let file = dir.path().join("a.iso");
+        fs::write(&file, "x").unwrap();
+        assert!(!is_protected(&file), "a normal nested file is fine");
     }
 
     #[test]

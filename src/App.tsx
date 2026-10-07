@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge, Body1, Button, Caption1, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
-  DialogTitle, FluentProvider, LargeTitle, MessageBar, MessageBarBody, Spinner, Subtitle2, Tab, TabList, Text,
+  DialogTitle, Dropdown, FluentProvider, LargeTitle, MessageBar, MessageBarBody, Option, Spinner, Subtitle2, Tab,
+  TabList, Text,
 } from "@fluentui/react-components";
 import {
   ArrowSync20Regular, CheckmarkCircle20Filled, ChevronDown20Regular, DismissCircle20Filled, ChevronUp20Regular, FolderOpen16Regular, Open16Regular,
 } from "@fluentui/react-icons";
 import { toPng } from "html-to-image";
 import { APP_NAME, freedBytes, Poster, type CleanedRow } from "./Poster";
-import { clean, fmt, fmtGB, fmtParts, inTauri, openTarget, reveal, savePoster, scan } from "./api";
+import { clean, fmt, fmtGB, fmtParts, inTauri, listDrives, openTarget, reveal, savePoster, scan } from "./api";
 import { darkTheme, lightTheme } from "./theme";
-import type { CleanReport, Finding, ScanResult, Selection, Tier } from "./types";
+import type { CleanReport, DriveInfo, Finding, ScanResult, Selection, Tier } from "./types";
 
 type Phase = "idle" | "scanning" | "results" | "confirm" | "cleaning" | "done";
 /** Items the user un-ticked inside a ticked finding, by finding id. */
@@ -51,14 +52,28 @@ export default function App() {
   const [excluded, setExcluded] = useState<Excluded>({});
   const [report, setReport] = useState<CleanReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [drives, setDrives] = useState<DriveInfo[]>([]);
+  const [drive, setDrive] = useState<string>("C:");
+
+  // Offer every local drive; default to the one holding the user's profile.
+  useEffect(() => {
+    listDrives()
+      .then((list) => {
+        setDrives(list);
+        const wanted = !inTauri ? new URLSearchParams(location.search).get("drive") : null;
+        setDrive(list.find((d) => d.letter === wanted)?.letter ?? list.find((d) => d.hasProfile)?.letter ?? list[0]?.letter ?? "C:");
+      })
+      .catch((e) => setError(String(e)));
+  }, []);
 
   const safeIds = (r: ScanResult) => new Set(r.findings.filter((x) => x.tier === "safe").map((x) => x.id));
 
-  async function startScan() {
+  async function startScan(d: string = drive) {
+    setDrive(d);
     setPhase("scanning");
     setError(null);
     try {
-      const r = await scan(setProgress);
+      const r = await scan(d, setProgress);
       setResult(r);
       setChecked(safeIds(r));
       setExcluded({});
@@ -134,7 +149,9 @@ export default function App() {
     const demo = new URLSearchParams(location.search).get("demo");
     if (inTauri || !demo) return;
     (async () => {
-      const r = await scan(() => {});
+      const wanted = new URLSearchParams(location.search).get("drive") ?? "C:";
+      setDrive(wanted);
+      const r = await scan(wanted, () => {});
       setResult(r);
       setChecked(safeIds(r));
       if (demo === "done" || demo === "small") {
@@ -155,12 +172,15 @@ export default function App() {
         <header className="bar">
           <div className="brand"><img className="mark" src="/logo.svg" alt="" width={24} height={24} />{APP_NAME}</div>
           {phase === "results" && (
-            <Button appearance="subtle" icon={<ArrowSync20Regular />} onClick={startScan}>Scan again</Button>
+            <div className="bar-actions">
+              {drives.length > 1 && <DriveSwitcher drives={drives} value={drive} onPick={(d) => startScan(d)} />}
+              <Button appearance="subtle" icon={<ArrowSync20Regular />} onClick={() => startScan()}>Scan again</Button>
+            </div>
           )}
         </header>
         {error && <MessageBar intent="error" className="gutter"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
 
-        {phase === "idle" && <Landing onScan={startScan} />}
+        {phase === "idle" && <Landing drives={drives} drive={drive} onPick={setDrive} onScan={() => startScan()} />}
         {phase === "scanning" && <Busy label={progress || "Starting…"} />}
         {phase === "cleaning" && <Busy label="Cleaning… this can take a minute for big folders." />}
         {showResults && (
@@ -186,13 +206,16 @@ export default function App() {
         {phase === "confirm" && (
           <Confirm chosen={chosen} excluded={excluded} bytes={chosenBytes} onCancel={() => setPhase("results")} onGo={runClean} />
         )}
-        {phase === "done" && report && result && <Done report={report} result={result} onAgain={startScan} />}
+        {phase === "done" && report && result && <Done report={report} result={result} onAgain={() => startScan()} />}
       </div>
     </FluentProvider>
   );
 }
 
-function Landing({ onScan }: { onScan: () => void }) {
+interface LandingProps { drives: DriveInfo[]; drive: string; onPick: (d: string) => void; onScan: () => void }
+
+function Landing({ drives, drive, onPick, onScan }: LandingProps) {
+  const picked = drives.find((d) => d.letter === drive);
   return (
     <main className="center">
       <img src="/logo.svg" alt="" width={84} height={84} />
@@ -201,9 +224,51 @@ function Landing({ onScan }: { onScan: () => void }) {
         {APP_NAME} looks for caches, old build folders, forgotten downloads and big games, explains each one in plain
         English, and only cleans what you tick. Scanning changes nothing.
       </Body1>
-      <Button appearance="primary" size="large" onClick={onScan}>Scan my computer</Button>
-      <Caption1 className="muted">Takes about a minute. Personal files go to the Recycle Bin first.</Caption1>
+
+      {drives.length > 1 && (
+        <div className="drives" role="radiogroup" aria-label="Drive to scan">
+          {drives.map((d) => {
+            const used = (d.total - d.free) / d.total;
+            const on = d.letter === drive;
+            return (
+              <button key={d.letter} type="button" role="radio" aria-checked={on} className={`drive ${on ? "on" : ""}`} onClick={() => onPick(d.letter)}>
+                <div className="drive-top">
+                  <span className="drive-letter">{d.letter}</span>
+                  <span className="drive-label">{d.label || "Local disk"}</span>
+                  {d.hasProfile && <Badge appearance="tint" color="brand" size="small">Windows</Badge>}
+                  {d.removable && <Badge appearance="tint" color="informative" size="small">Removable</Badge>}
+                </div>
+                <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round(used * 100)}%` }} /></div>
+                <Caption1 className="muted">{fmt(d.free)} free of {fmt(d.total)}</Caption1>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <Button appearance="primary" size="large" onClick={onScan}>
+        {drives.length > 1 ? `Scan drive ${drive}` : "Scan my computer"}
+      </Button>
+      <Caption1 className="muted lead">
+        {picked && !picked.hasProfile
+          ? "Looks for old code projects, big old files, Steam games and this drive's Recycle Bin. App caches and Downloads live on your Windows drive."
+          : "Takes about a minute. Personal files go to the Recycle Bin first."}
+      </Caption1>
     </main>
+  );
+}
+
+function DriveSwitcher({ drives, value, onPick }: { drives: DriveInfo[]; value: string; onPick: (d: string) => void }) {
+  const label = (d: DriveInfo) => `${d.letter} ${d.label || "Local disk"} · ${fmt(d.free)} free`;
+  return (
+    <Dropdown
+      className="drive-switch" aria-label="Drive" size="small"
+      value={label(drives.find((d) => d.letter === value) ?? drives[0])}
+      selectedOptions={[value]}
+      onOptionSelect={(_, d) => d.optionValue && d.optionValue !== value && onPick(d.optionValue)}
+    >
+      {drives.map((d) => <Option key={d.letter} value={d.letter} text={label(d)}>{label(d)}</Option>)}
+    </Dropdown>
   );
 }
 

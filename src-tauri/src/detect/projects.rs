@@ -58,20 +58,31 @@ pub struct ProjectScan {
     pub stale: u32,
 }
 
-/// Common places people keep code, on the system drive only so the numbers
-/// match the drive gauge.
-pub fn default_roots() -> Vec<PathBuf> {
-    let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
+/// Where to look for code projects on one drive, so the numbers match that drive's gauge.
+/// The drive with the user's profile gets the usual dev folders; any other drive is
+/// searched from its top-level folders (a project folder is only touched when its marker
+/// file sits next to the junk, so this stays safe).
+pub fn default_roots(drive: &str) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = ["code", "dev", "projects", "src", "repos"]
         .iter()
         .map(|d| PathBuf::from(format!("{drive}\\{d}")))
         .collect();
-    if let Some(home) = dirs::home_dir() {
-        for d in [
-            "code", "dev", "projects", "src", "repos", r"source\repos", r"Documents\GitHub",
-            r"Documents\Projects", "AndroidStudioProjects", "StudioProjects", "Desktop", r"go\src",
-        ] {
-            roots.push(home.join(d));
+    if drive.eq_ignore_ascii_case(&crate::paths::profile_drive()) {
+        if let Some(home) = dirs::home_dir() {
+            for d in [
+                "code", "dev", "projects", "src", "repos", r"source\repos", r"Documents\GitHub",
+                r"Documents\Projects", "AndroidStudioProjects", "StudioProjects", "Desktop", r"go\src",
+            ] {
+                roots.push(home.join(d));
+            }
+        }
+    } else if let Ok(rd) = std::fs::read_dir(format!("{drive}\\")) {
+        for e in rd.flatten() {
+            let is_dir = e.file_type().map(|t| t.is_dir() && !t.is_symlink()).unwrap_or(false);
+            let name = e.file_name().to_string_lossy().to_lowercase();
+            if is_dir && !super::SYSTEM_DIRS.contains(&name.as_str()) {
+                roots.push(e.path());
+            }
         }
     }
     roots.retain(|p| p.is_dir());

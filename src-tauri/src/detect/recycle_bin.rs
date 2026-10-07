@@ -1,6 +1,6 @@
-//! Measures the current user's Recycle Bin on the system drive by reading the
-//! small `$I…` record Windows writes for every deleted item (it stores the
-//! original size, so we never have to walk the deleted files themselves).
+//! Measures the current user's Recycle Bin on one drive by reading the small
+//! `$I…` record Windows writes for every deleted item (it stores the original
+//! size, so we never have to walk the deleted files themselves).
 
 use super::MB;
 use crate::model::{Finding, Plan, Tier};
@@ -8,8 +8,7 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 
-pub fn detect() -> Option<Finding> {
-    let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
+pub fn detect(drive: &str) -> Option<Finding> {
     let bin = PathBuf::from(format!("{drive}\\$Recycle.Bin"));
     let (mut bytes, mut count) = (0u64, 0u32);
     // Other users' folders aren't readable, so this only ever counts ours.
@@ -30,13 +29,13 @@ pub fn detect() -> Option<Finding> {
     if bytes < 50 * MB {
         return None;
     }
-    let plan = Plan::EmptyRecycleBin;
+    let plan = Plan::EmptyRecycleBin(drive.to_uppercase());
     Some(Finding {
         id: "recycle-bin".into(),
-        name: "Recycle Bin".into(),
+        name: format!("Recycle Bin ({})", drive.to_uppercase()),
         category: "Recycle Bin".into(),
         tier: Tier::Ask,
-        what: format!("{count} files and folders you deleted earlier. They still use space until the bin is emptied."),
+        what: format!("{count} files and folders you deleted earlier from this drive. They still use space until the bin is emptied."),
         after: Some("They're gone for good. Open the bin first if you might want something back.".into()),
         how: None,
         open: Some("shell:RecycleBinFolder".into()),

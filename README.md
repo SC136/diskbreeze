@@ -18,6 +18,8 @@ Get the Windows installer from the [latest release](https://github.com/SC136/dis
    - forgotten Downloads: ISOs, archives you already unpacked, installer folders, big old files
    - installed Steam games, with last-played dates
    - the Recycle Bin
+
+   **Pick a drive.** The drive that holds your Windows profile gets everything above. Any other drive is searched for old code projects, big loose files (disk images, archives, videos, VM disks, backups), Steam games and its own Recycle Bin. Parts of installed games and apps are never offered.
 2. **Sorts** the results into three groups: *Safe to clean* (pre-ticked), *Your call* (never pre-ticked) and *Do it yourself* (needs another app or admin rights, so we only explain).
 3. **Cleans** what you tick after a confirm screen. Personal files go to the Recycle Bin. Caches are deleted for good because they rebuild themselves.
 4. **Shows a share card** with your before/after numbers.

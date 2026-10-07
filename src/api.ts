@@ -1,4 +1,4 @@
-import type { CleanReport, Finding, ScanResult, Selection } from "./types";
+import type { CleanReport, DriveInfo, Finding, ScanResult, Selection } from "./types";
 
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;
@@ -39,22 +39,62 @@ function f(id: string, name: string, category: string, tier: Finding["tier"], by
 const mockDisk = { mount: "C:\\", total: 932 * GB, free: 56.6 * GB };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function scan(onProgress: (detail: string) => void): Promise<ScanResult> {
+const mockDrives: DriveInfo[] = [
+  { letter: "C:", label: "OS", total: 932 * GB, free: 56.6 * GB, removable: false, hasProfile: true },
+  { letter: "D:", label: "Data", total: 1863 * GB, free: 612 * GB, removable: false, hasProfile: false },
+  { letter: "E:", label: "USB Drive", total: 59 * GB, free: 21 * GB, removable: true, hasProfile: false },
+];
+
+/** Sample findings for a drive that doesn't hold the user's profile. */
+const mockDataFindings: Finding[] = [
+  f("old-project-builds", "Build files in old projects", "Old project builds", "safe", 11.2 * GB,
+    "node_modules, build output and virtual environments in 14 projects you haven't edited in 60+ days. Your code isn't touched; these folders are rebuilt from it.",
+    "When you go back to a project, run its install or build step again.", "Deletes 14 folders",
+    [["D:\\Work\\store-front\\node_modules", 3.1 * GB, "node_modules · last edited 4 months ago"], ["D:\\Work\\game-jam\\Library", 2.6 * GB, "Library · last edited 8 months ago"]]),
+  f("bigfiles", "Big files you haven't opened in months", "Big files", "ask", 38.4 * GB,
+    "Large disk images, archives, videos, VM disks and backups that haven't changed in over 3 months. Only loose files like these are listed, never parts of an installed game or app.",
+    "They go to the Recycle Bin, so you can still get them back.", "Moves 3 items to the Recycle Bin",
+    [["D:\\Backups\\laptop-2025.vhdx", 24 * GB, "last changed 14 months ago"], ["D:\\Videos\\raw\\trip-footage.mkv", 9.8 * GB, "last changed 7 months ago"], ["D:\\Installers\\win11.iso", 4.6 * GB, "last changed 5 months ago"]], true),
+  f("steam-games", "Steam games", "Games", "manual", 84 * GB, "Installed games. Uninstalling frees the space, and you can reinstall any time.", null, "You do this one yourself",
+    [["Baldur's Gate 3", 84 * GB, "Baldur's Gate 3 · last played 6 months ago"]]),
+  f("recycle-bin", "Recycle Bin (D:)", "Recycle Bin", "ask", 6.1 * GB, "31 files and folders you deleted earlier from this drive. They still use space until the bin is emptied.", "They're gone for good. Open the bin first if you might want something back.", "Empties the Recycle Bin on D: permanently", []),
+];
+
+export async function listDrives(): Promise<DriveInfo[]> {
+  if (inTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<DriveInfo[]>("list_drives");
+  }
+  return mockDrives;
+}
+
+export async function scan(drive: string, onProgress: (detail: string) => void): Promise<ScanResult> {
   if (inTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
     const { listen } = await import("@tauri-apps/api/event");
     const off = await listen<{ detail: string }>("progress", (e) => onProgress(e.payload.detail));
     try {
-      return await invoke<ScanResult>("scan");
+      return await invoke<ScanResult>("scan", { drive });
     } finally {
       off();
     }
   }
-  for (const d of ["Checking known space hogs…", "Looking for old code projects…", "Looking through Downloads…", "Measuring the Recycle Bin…"]) {
+  const data = drive !== "C:";
+  const steps = data
+    ? ["Looking for old code projects…", "Looking for big old files…", "Checking Steam games…", "Measuring the Recycle Bin…"]
+    : ["Checking known space hogs…", "Looking for old code projects…", "Looking through Downloads…", "Measuring the Recycle Bin…"];
+  for (const d of steps) {
     onProgress(d);
     await sleep(500);
   }
-  return { disk: mockDisk, findings: mockFindings, activeProjects: 27, staleProjects: 192, tookMs: 2000 };
+  const d = mockDrives.find((x) => x.letter === drive) ?? mockDrives[0];
+  return {
+    disk: { mount: `${d.letter}\\`, total: d.total, free: d.free },
+    findings: data ? mockDataFindings : mockFindings,
+    activeProjects: data ? 3 : 27,
+    staleProjects: data ? 14 : 192,
+    tookMs: 2000,
+  };
 }
 
 export async function clean(selections: Selection[]): Promise<CleanReport> {
@@ -64,7 +104,7 @@ export async function clean(selections: Selection[]): Promise<CleanReport> {
   }
   await sleep(1500);
   const rows = selections.flatMap((s) => {
-    const x = mockFindings.find((m) => m.id === s.id);
+    const x = [...mockFindings, ...mockDataFindings].find((m) => m.id === s.id);
     if (!x) return [];
     const bytes = s.paths ? x.items.filter((i) => s.paths!.includes(i.path)).reduce((t, i) => t + i.bytes, 0) : x.bytes;
     return [{ x, bytes }];

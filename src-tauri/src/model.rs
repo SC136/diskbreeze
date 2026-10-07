@@ -25,7 +25,8 @@ pub enum Plan {
     Recycle(Vec<PathBuf>),
     /// Run the tool's own clean command; fall back to another plan if it fails.
     Command { cmd: String, fallback: Option<Box<Plan>> },
-    EmptyRecycleBin,
+    /// Empty the Recycle Bin items that came from this drive (e.g. "D:"), and only that drive.
+    EmptyRecycleBin(String),
     Manual,
 }
 
@@ -45,7 +46,7 @@ impl Plan {
                 plural(p.len())
             ),
             Plan::Command { cmd, .. } => format!("Runs `{cmd}`"),
-            Plan::EmptyRecycleBin => "Empties the Recycle Bin permanently".into(),
+            Plan::EmptyRecycleBin(d) => format!("Empties the Recycle Bin on {d} permanently"),
             Plan::Manual => "You do this one yourself".into(),
         }
     }
@@ -95,7 +96,7 @@ mod tests {
         let Plan::Recycle(left) = plan.restrict(&keep) else { panic!("plan kind changed") };
         assert_eq!(left, vec![PathBuf::from(r"C:\a\One.iso")]);
         assert!(plan.itemizable());
-        assert!(!Plan::EmptyRecycleBin.itemizable());
+        assert!(!Plan::EmptyRecycleBin("C:".into()).itemizable());
     }
 }
 
@@ -147,6 +148,20 @@ pub struct DiskInfo {
     pub mount: String,
     pub total: u64,
     pub free: u64,
+}
+
+/// A drive the user can choose to scan.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveInfo {
+    /// "C:"
+    pub letter: String,
+    pub label: String,
+    pub total: u64,
+    pub free: u64,
+    pub removable: bool,
+    /// Holds the user's profile, so app caches and Downloads live here.
+    pub has_profile: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
