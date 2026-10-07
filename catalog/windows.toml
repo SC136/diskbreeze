@@ -265,6 +265,61 @@ after = "Nothing visible. Close your editor first so nothing is skipped."
 action = "contents"
 
 [[item]]
+id = "jetbrains-caches"
+name = "JetBrains IDE caches"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\JetBrains\*\caches', '%LOCALAPPDATA%\JetBrains\*\log']
+what = "Index and syntax caches for IntelliJ, PyCharm, WebStorm, Rider and other JetBrains IDEs."
+after = "Your IDE re-indexes projects the next time you open them. Close JetBrains IDEs first."
+action = "contents"
+min_mb = 100
+
+[[item]]
+id = "vcpkg-archives"
+name = "vcpkg binary cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\vcpkg\archives']
+what = "Pre-built binary package archives cached by the vcpkg C++ package manager."
+after = "Packages rebuild or download again on the next vcpkg install."
+action = "contents"
+min_mb = 200
+
+[[item]]
+id = "winget-cache"
+name = "WinGet installer cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\Microsoft\WinGet\Packages']
+what = "Downloaded app installer packages cached by Windows Package Manager (winget)."
+after = "WinGet downloads installers afresh next time you install or upgrade an app."
+action = "contents"
+min_mb = 100
+
+[[item]]
+id = "unity-cache"
+name = "Unity editor cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\Unity\cache']
+what = "Shader, texture and asset compiler cache for the Unity editor."
+after = "Unity rebuilds cache files the next time you open a project."
+action = "contents"
+min_mb = 200
+
+[[item]]
+id = "unreal-ddc"
+name = "Unreal Engine Derived Data Cache"
+category = "Developer caches"
+tier = "safe"
+paths = ['%LOCALAPPDATA%\UnrealEngine\Common\DerivedDataCache']
+what = "Compiled shaders, compressed textures and audio data cached by Unreal Engine."
+after = "Unreal re-derives asset data when opening a project that needs it."
+action = "contents"
+min_mb = 500
+
+[[item]]
 id = "android-emulators"
 name = "Android emulators"
 category = "Developer caches"
@@ -404,6 +459,28 @@ paths = ['%LOCALAPPDATA%\Spotify\Storage']
 what = "Songs Spotify kept locally so they start faster."
 after = "Songs stream again. Downloaded playlists may need to download again."
 action = "contents"
+
+[[item]]
+id = "adobe-media-cache"
+name = "Adobe Media Cache"
+category = "Browsers & apps"
+tier = "safe"
+paths = ['%APPDATA%\Adobe\Common\Media Cache Files', '%APPDATA%\Adobe\Common\Media Cache']
+what = "Conformed audio files, peak waveforms and video cache from Premiere Pro and After Effects."
+after = "Adobe apps re-generate preview and peak files when you re-open an active video project."
+action = "contents"
+min_mb = 500
+
+[[item]]
+id = "apple-device-backups"
+name = "iPhone and iPad backups"
+category = "Browsers & apps"
+tier = "ask"
+paths = ['%APPDATA%\Apple Computer\MobileSync\Backup', '{home}\Apple\MobileSync\Backup']
+what = "Local device backups created when syncing an iPhone or iPad with your PC."
+after = "Backups go to the Recycle Bin. Create a new backup in the Apple Devices app or iTunes if needed."
+action = "recycle"
+min_mb = 1000
 
 # ───────────────────────────────── Games ─────────────────────────────────
 

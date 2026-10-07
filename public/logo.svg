@@ -1,21 +1,52 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="DiskBreeze">
   <defs>
+    <!-- Background rich teal gradient matching theme ramp -->
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2bb3a6"/>
-      <stop offset="1" stop-color="#0f5d57"/>
+      <stop offset="0%" stop-color="#19776f"/>
+      <stop offset="45%" stop-color="#104b46"/>
+      <stop offset="100%" stop-color="#072321"/>
     </linearGradient>
-    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    <!-- Ambient top-down light sheen -->
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="50%" stop-color="#6df5e3" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.2"/>
+    </linearGradient>
+    <!-- Glowing active disk arc -->
+    <linearGradient id="arc" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1bb5a4"/>
+      <stop offset="45%" stop-color="#46edd8"/>
+      <stop offset="100%" stop-color="#c4fcf4"/>
+    </linearGradient>
+    <!-- Wind breeze highlight -->
+    <linearGradient id="breeze" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#eafcf9"/>
+      <stop offset="100%" stop-color="#ffffff"/>
     </linearGradient>
   </defs>
+
+  <!-- App icon container (Windows 11 squircle) -->
   <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
-  <rect width="1024" height="1024" rx="232" fill="url(#shine)"/>
-  <!-- disk-usage ring: track + used arc -->
-  <circle cx="512" cy="512" r="292" fill="none" stroke="#fff" stroke-opacity=".24" stroke-width="112"/>
-  <circle cx="512" cy="512" r="292" fill="none" stroke="#fff" stroke-width="112" stroke-linecap="round"
-          stroke-dasharray="1320 1835" transform="rotate(-90 512 512)"/>
-  <!-- medical cross -->
-  <rect x="468" y="396" width="88" height="232" rx="26" fill="#fff"/>
-  <rect x="396" y="468" width="232" height="88" rx="26" fill="#fff"/>
+  <rect width="1024" height="1024" rx="232" fill="url(#sheen)"/>
+  <rect x="20" y="20" width="984" height="984" rx="216" fill="none" stroke="#6df5e3" stroke-width="4" stroke-opacity="0.24"/>
+
+  <!-- Disk-usage circular gauge track -->
+  <circle cx="512" cy="512" r="296" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="92"/>
+
+  <!-- Active disk arc (showing freed space) -->
+  <circle cx="512" cy="512" r="296" fill="none" stroke="url(#arc)" stroke-width="92" stroke-linecap="round"
+          stroke-dasharray="1395 1860" transform="rotate(-110 512 512)"/>
+
+  <!-- Aerodynamic breeze streams replacing the old medical cross -->
+  <!-- Top breeze curve with vortex curl -->
+  <path d="M 350 410 H 590 C 632 410, 662 380, 662 342 C 662 304, 630 274, 592 274 C 554 274, 530 304, 530 338"
+        fill="none" stroke="url(#breeze)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Primary horizontal breeze stream cutting through the center -->
+  <path d="M 264 512 H 676 C 720 512, 754 544, 754 586 C 754 628, 720 658, 678 658 C 640 658, 614 632, 614 598"
+        fill="none" stroke="url(#breeze)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Lower supporting breeze wave -->
+  <path d="M 374 614 H 526"
+        fill="none" stroke="url(#breeze)" stroke-width="54" stroke-linecap="round"/>
 </svg>

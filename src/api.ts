@@ -176,6 +176,27 @@ export function historyReport(e: HistoryEntry): string {
   return lines.join("\n");
 }
 
+/** A plain-text report of all scan findings, formatted for sharing or reporting. */
+export function scanReport(result: ScanResult): string {
+  const { disk, findings, activeProjects, staleProjects } = result;
+  const reclaimable = findings.filter((f) => f.tier !== "manual" && !f.estimate).reduce((s, f) => s + f.bytes, 0);
+  const lines = [
+    `DiskBreeze Scan Report — Drive ${disk.mount}`,
+    `Total capacity: ${fmt(disk.total)} | Free space: ${fmt(disk.free)}`,
+    `Reclaimable: ~${fmt(reclaimable)}`,
+    staleProjects > 0 ? `Code projects: ${staleProjects} old build folders found (${activeProjects} active projects untouched)` : "",
+    `Generated: ${new Date().toLocaleString()}`,
+    "",
+    "Findings:",
+    ...findings.map((f) => {
+      const sizeStr = f.estimate ? (f.bytes > 0 ? `up to ${fmt(f.bytes)}` : "varies") : fmt(f.bytes);
+      const tag = f.tier === "safe" ? "[SAFE]" : f.tier === "ask" ? "[ASK]" : "[DIY]";
+      return `${tag} ${f.name} (${f.category}): ${sizeStr} - ${f.what}`;
+    }),
+  ];
+  return lines.filter(Boolean).join("\n");
+}
+
 let pendingUpdate: { downloadAndInstall: (cb: (ev: { event: string; data?: { contentLength?: number; chunkLength?: number } }) => void) => Promise<void> } | null = null;
 
 /** Ask GitHub whether a newer version exists. Returns null when up to date. Never throws. */

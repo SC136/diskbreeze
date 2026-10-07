@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge, Body1, Button, Caption1, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
   DialogTitle, Dropdown, FluentProvider, LargeTitle, MessageBar, MessageBarActions, MessageBarBody, Option,
-  ProgressBar, Spinner, Subtitle2, Tab, TabList, Text,
+  ProgressBar, SearchBox, Spinner, Subtitle2, Tab, TabList, Text,
 } from "@fluentui/react-components";
 import {
   ArrowDownload20Regular, ArrowSync20Regular, CheckmarkCircle20Filled, ChevronDown20Regular, Copy20Regular,
@@ -12,7 +12,7 @@ import { toPng } from "html-to-image";
 import { APP_NAME, freedBytes, Poster, type CleanedRow } from "./Poster";
 import {
   appVersion, checkForUpdate, clean, fmt, fmtGB, fmtParts, getHistory, historyReport, inTauri, installUpdate, listDrives,
-  openHistoryFolder, openTarget, reveal, savePoster, scan, shortNotes,
+  openHistoryFolder, openTarget, reveal, savePoster, scan, scanReport, shortNotes,
 } from "./api";
 import { darkTheme, lightTheme } from "./theme";
 import type { CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, Tier, UpdateInfo } from "./types";
@@ -441,10 +441,35 @@ function Results({ result, info, checked, excluded, onFinding, onItem, onTier }:
   const preview = new URLSearchParams(location.search);
   const [tab, setTab] = useState<Tier>((!inTauri && (preview.get("tab") as Tier)) || tiers[0]?.tier || "safe");
   const [open, setOpen] = useState<string | null>(!inTauri ? preview.get("open") : null);
+  const [search, setSearch] = useState("");
+  const [copied, setCopied] = useState(false);
+
   const list = result.findings.filter((f) => f.tier === tab);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (f) =>
+        f.name.toLowerCase().includes(q) ||
+        f.category.toLowerCase().includes(q) ||
+        f.what.toLowerCase().includes(q) ||
+        f.items.some((i) => i.path.toLowerCase().includes(q) || (i.note && i.note.toLowerCase().includes(q)))
+    );
+  }, [list, search]);
+
   const max = Math.max(...list.map((f) => f.bytes), 1);
   const current = TIERS.find((t) => t.tier === tab)!;
-  const allOn = list.length > 0 && list.every((f) => checked.has(f.id));
+  const allOn = filtered.length > 0 && filtered.every((f) => checked.has(f.id));
+
+  async function copyReport() {
+    try {
+      await navigator.clipboard.writeText(scanReport(result));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked */
+    }
+  }
 
   const hero = (
     <section className="hero">
@@ -496,22 +521,43 @@ function Results({ result, info, checked, excluded, onFinding, onItem, onTier }:
       </TabList>
 
       <div className="toolbar">
-        <Caption1 className="muted">{current.blurb}</Caption1>
-        {tab !== "manual" && (
-          <Button appearance="transparent" size="small" onClick={() => onTier(tab, !allOn)}>
-            {allOn ? "Select none" : "Select all"}
+        <div className="toolbar-left">
+          <SearchBox
+            size="small"
+            placeholder={`Filter ${current.title.toLowerCase()}…`}
+            value={search}
+            onChange={(_, d) => setSearch(d.value)}
+            className="search-box"
+            aria-label="Filter findings"
+          />
+          <Caption1 className="muted toolbar-blurb">{current.blurb}</Caption1>
+        </div>
+        <div className="toolbar-actions">
+          <Button appearance="subtle" size="small" icon={<Copy20Regular />} onClick={copyReport}>
+            {copied ? "Report copied" : "Copy report"}
           </Button>
-        )}
+          {tab !== "manual" && (
+            <Button appearance="transparent" size="small" onClick={() => onTier(tab, !allOn)}>
+              {allOn ? "Select none" : "Select all"}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="rows">
-        {list.map((f) => (
+        {filtered.map((f) => (
           <Row
             key={f.id} f={f} max={max} ex={excluded} on={checked.has(f.id)} open={open === f.id}
             onOpen={() => setOpen(open === f.id ? null : f.id)}
             onToggle={() => onFinding(f)} onItem={(p) => onItem(f, p)}
           />
         ))}
+        {filtered.length === 0 && search && (
+          <div className="empty-search">
+            <Body1 className="muted">No findings matching &ldquo;{search}&rdquo; in {current.title}.</Body1>
+            <Button appearance="subtle" size="small" onClick={() => setSearch("")}>Clear search</Button>
+          </div>
+        )}
       </div>
     </main>
   );
