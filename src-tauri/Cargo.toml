@@ -1,6 +1,6 @@
 [package]
 name = "diskbreeze"
-version = "0.1.0"
+version = "0.2.0"
 description = "Find out what is filling your disk and clean it up safely"
 authors = ["DiskBreeze contributors"]
 edition = "2021"

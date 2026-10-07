@@ -6,7 +6,7 @@ Find out what's filling your disk, understand it in plain English, and clean onl
 
 ## Download
 
-Get the Windows installer from the [latest release](https://github.com/SC136/diskbreeze/releases/latest) (about 2 MB). It isn't code-signed yet, so Windows SmartScreen may warn on first run: click **More info → Run anyway**. Scanning never changes anything, and you review every cleanup before it runs.
+Get the Windows installer from the [releases page](https://github.com/SC136/diskbreeze/releases) (about 2 MB). It isn't code-signed yet, so Windows SmartScreen may warn on first run: click **More info → Run anyway**. Scanning never changes anything, and you review every cleanup before it runs.
 
 ![Results screen with a breakdown of what was cleaned, and the shareable card](docs/screenshots/done.png)
 
