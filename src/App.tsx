@@ -32,6 +32,11 @@ const TIERS: { tier: Tier; title: string; blurb: string }[] = [
   { tier: "manual", title: "Do it yourself", blurb: "These need another app or admin rights, so we only explain." },
 ];
 
+/** "up to 11.5 GB" / "varies" for estimates, a plain size otherwise. */
+const sizeLabel = (f: Finding, bytes: number) => (f.estimate ? (bytes > 0 ? `up to ${fmt(bytes)}` : "varies") : fmt(bytes));
+/** These run as administrator: Windows shows its own permission prompt first. */
+const needsPermission = (f: Finding) => f.action.startsWith("Windows will ask for administrator permission");
+
 const selBytes = (f: Finding, ex: Excluded) => {
   const e = ex[f.id];
   if (!f.selectable || !e || e.size === 0) return f.bytes;
@@ -129,7 +134,8 @@ export default function App() {
   }
 
   const chosen = useMemo(() => result?.findings.filter((f) => checked.has(f.id)) ?? [], [result, checked]);
-  const chosenBytes = chosen.reduce((s, f) => s + selBytes(f, excluded), 0);
+  // Estimates ("up to", "varies") are shown on their rows but never added into totals.
+  const chosenBytes = chosen.reduce((s, f) => s + (f.estimate ? 0 : selBytes(f, excluded)), 0);
 
   function selections(): Selection[] {
     return chosen.map((f) => {
@@ -197,7 +203,8 @@ export default function App() {
       setDrive(wanted);
       const r = await scan(wanted, () => {});
       setResult(r);
-      setChecked(safeIds(r));
+      const pick = new URLSearchParams(location.search).get("pick");
+      setChecked(pick ? new Set(pick.split(",")) : safeIds(r));
       if (demo === "done" || demo === "small") {
         const ids = demo === "small" ? ["temp-files"] : [...safeIds(r)];
         setReport(await clean(ids.map((id) => ({ id }))));
@@ -427,7 +434,7 @@ interface ResultsProps {
 function Results({ result, info, checked, excluded, onFinding, onItem, onTier }: ResultsProps) {
   const { disk } = result;
   const used = (disk.total - disk.free) / disk.total;
-  const reclaimable = result.findings.filter((f) => f.tier !== "manual").reduce((s, f) => s + f.bytes, 0);
+  const reclaimable = result.findings.filter((f) => f.tier !== "manual" && !f.estimate).reduce((s, f) => s + f.bytes, 0);
   const tiers = TIERS.filter((t) => result.findings.some((f) => f.tier === t.tier));
   // ?tab= and ?open= are browser-only preview helpers
   const preview = new URLSearchParams(location.search);
@@ -516,7 +523,8 @@ interface RowProps {
 
 function Row({ f, max, ex, on, open, onOpen, onToggle, onItem }: RowProps) {
   const manual = f.tier === "manual";
-  const steam = f.id === "steam-games";
+  // These list "Name · detail" in the note, and the name isn't a file path.
+  const steam = f.id === "steam-games" || f.id === "installed-apps";
   const excl = ex[f.id];
   const partial = on && f.selectable && !!excl && excl.size > 0;
   const shown = partial ? selBytes(f, ex) : f.bytes;
@@ -536,7 +544,7 @@ function Row({ f, max, ex, on, open, onOpen, onToggle, onItem }: RowProps) {
             {!open && <Body1 className="row-what">{f.what}</Body1>}
           </div>
           <div className="row-size">
-            <Text weight="semibold" size={500}>{fmt(shown)}</Text>
+            <Text weight="semibold" size={500}>{sizeLabel(f, shown)}</Text>
             <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(2, (shown / max) * 100)}%` }} /></div>
           </div>
         </div>
@@ -584,8 +592,11 @@ function Row({ f, max, ex, on, open, onOpen, onToggle, onItem }: RowProps) {
 }
 
 function Confirm({ chosen, excluded, bytes, onCancel, onGo }: { chosen: Finding[]; excluded: Excluded; bytes: number; onCancel: () => void; onGo: () => void }) {
-  const permanent = chosen.some((f) => !f.recycles);
+  // Folders and caches that are removed outright (not recycled, not an admin step, not OneDrive).
+  const permanent = chosen.some((f) => !f.recycles && !needsPermission(f) && f.id !== "onedrive-free-up" && !f.id.startsWith("docker-"));
   const binSelected = chosen.some((f) => f.id === "recycle-bin");
+  const admin = chosen.filter(needsPermission);
+  const oneDrive = chosen.some((f) => f.id === "onedrive-free-up");
   return (
     <Dialog open modalType="modal" onOpenChange={(_, d) => !d.open && onCancel()}>
       <DialogSurface>
@@ -598,8 +609,9 @@ function Confirm({ chosen, excluded, bytes, onCancel, onGo }: { chosen: Finding[
                 return (
                   <li key={f.id}>
                     <b>{f.name}{partial && <span className="muted"> · {selCount(f, excluded)} of {f.items.length} items</span>}</b>
-                    <span>{fmt(selBytes(f, excluded))}</span>
+                    <span>{sizeLabel(f, selBytes(f, excluded))}</span>
                     <em>{f.action}</em>
+                    {needsPermission(f) && f.after && <em className="plan-after">{f.after}</em>}
                   </li>
                 );
               })}
@@ -612,6 +624,16 @@ function Confirm({ chosen, excluded, bytes, onCancel, onGo }: { chosen: Finding[
             {binSelected && (
               <MessageBar intent="warning" className="gap-top"><MessageBarBody>
                 Emptying the Recycle Bin is permanent. Open the bin first if you might want something back.
+              </MessageBarBody></MessageBar>
+            )}
+            {admin.length > 0 && (
+              <MessageBar intent="info" className="gap-top"><MessageBarBody>
+                Windows will show a permission prompt for: {admin.map((f) => f.name).join(", ")}. Nothing runs unless you allow it, and a few of these take a few minutes.
+              </MessageBarBody></MessageBar>
+            )}
+            {oneDrive && (
+              <MessageBar intent="info" className="gap-top"><MessageBarBody>
+                OneDrive files stay safe in the cloud. Here they become online-only and download again when you open them.
               </MessageBarBody></MessageBar>
             )}
           </DialogContent>
@@ -678,6 +700,7 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
                 <Text weight="semibold">{name(o.id)}</Text>
                 {!o.ok && <Caption1 className="err">{o.message}</Caption1>}
                 {o.ok && o.recycled && <Caption1 className="muted">Moved to the Recycle Bin</Caption1>}
+                {o.ok && !o.recycled && o.message && <Caption1 className="muted">{o.message}</Caption1>}
               </div>
               {o.ok && <Text weight="semibold">{fmt(o.bytes)}</Text>}
             </li>

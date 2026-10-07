@@ -103,6 +103,7 @@ fn make(mut found: Vec<Big>) -> Option<Finding> {
         open: None,
         bytes,
         selectable: items.len() > 1,
+        estimate: false,
         items,
         recycles: true,
         action: plan.summary(),

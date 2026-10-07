@@ -19,6 +19,8 @@ export interface Finding {
   bytes: number;
   /** Individual items can be ticked instead of all-or-nothing. */
   selectable: boolean;
+  /** `bytes` is an upper bound (or 0 = unknown): show "up to" / "varies", keep it out of totals. */
+  estimate: boolean;
   items: Item[];
   recycles: boolean;
   action: string;

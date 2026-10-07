@@ -41,6 +41,7 @@ pub fn detect(drive: &str) -> Option<Finding> {
         open: Some("shell:RecycleBinFolder".into()),
         bytes,
         selectable: false,
+        estimate: false,
         items: vec![],
         recycles: false,
         action: plan.summary(),

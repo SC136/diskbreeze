@@ -1,5 +1,5 @@
 use crate::catalog;
-use crate::detect::{bigfiles, downloads, projects, recycle_bin, steam};
+use crate::detect::{apps, bigfiles, docker, downloads, onedrive, projects, recycle_bin, steam, wsl};
 use crate::model::{DiskInfo, DriveInfo, Finding, ScanResult};
 use crate::paths;
 use std::time::Instant;
@@ -73,6 +73,13 @@ pub fn run(drive: &str, progress: impl Fn(&str, &str) + Sync) -> ScanResult {
     if has_profile {
         progress("downloads", "Looking through Downloads…");
         findings.extend(downloads::detect());
+        progress("onedrive", "Checking OneDrive…");
+        findings.extend(onedrive::detect());
+        progress("docker", "Checking Docker and WSL…");
+        findings.extend(docker::detect());
+        findings.extend(wsl::detect());
+        progress("apps", "Listing installed programs…");
+        findings.extend(apps::detect());
     } else {
         progress("bigfiles", "Looking for big old files…");
         findings.extend(bigfiles::detect(&drive));

@@ -176,3 +176,4 @@ html, body, #root { height: 100%; margin: 0; }
 .h-outcomes .bad { color: var(--colorPaletteRedForeground1); display: flex; }
 .h-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
 .h-actions { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px 10px 8px; }
+.plan li em.plan-after { color: var(--colorNeutralForeground2); }

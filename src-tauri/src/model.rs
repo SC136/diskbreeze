@@ -27,6 +27,11 @@ pub enum Plan {
     Command { cmd: String, fallback: Option<Box<Plan>> },
     /// Empty the Recycle Bin items that came from this drive (e.g. "D:"), and only that drive.
     EmptyRecycleBin(String),
+    /// Run a PowerShell script as administrator (Windows shows its permission prompt). The
+    /// script always comes from our own catalog or detectors, never from the UI.
+    Admin { script: String, label: String },
+    /// Make OneDrive files online-only ("free up space"): the cloud copy stays, the local copy goes.
+    Dehydrate(Vec<PathBuf>),
     Manual,
 }
 
@@ -47,6 +52,12 @@ impl Plan {
             ),
             Plan::Command { cmd, .. } => format!("Runs `{cmd}`"),
             Plan::EmptyRecycleBin(d) => format!("Empties the Recycle Bin on {d} permanently"),
+            Plan::Admin { label, .. } => format!("Windows will ask for administrator permission to {label}"),
+            Plan::Dehydrate(p) => format!(
+                "Makes {} file{} online-only; the copy in OneDrive stays",
+                p.len(),
+                plural(p.len())
+            ),
             Plan::Manual => "You do this one yourself".into(),
         }
     }
@@ -57,7 +68,7 @@ impl Plan {
 
     /// True when the plan acts on a list of paths, so the user can pick which ones.
     pub fn itemizable(&self) -> bool {
-        matches!(self, Plan::Delete(_) | Plan::Recycle(_) | Plan::DeleteContents { .. })
+        matches!(self, Plan::Delete(_) | Plan::Recycle(_) | Plan::Dehydrate(_) | Plan::DeleteContents { .. })
     }
 
     /// Keep only the paths in `keep` (lowercased path strings). Other plans are unchanged.
@@ -68,6 +79,7 @@ impl Plan {
         match self {
             Plan::Delete(v) => Plan::Delete(pick(v)),
             Plan::Recycle(v) => Plan::Recycle(pick(v)),
+            Plan::Dehydrate(v) => Plan::Dehydrate(pick(v)),
             Plan::DeleteContents { dirs, min_age_days } => {
                 Plan::DeleteContents { dirs: pick(dirs), min_age_days: *min_age_days }
             }
@@ -122,6 +134,9 @@ pub struct Finding {
     pub bytes: u64,
     /// The user can tick individual items instead of all-or-nothing.
     pub selectable: bool,
+    /// `bytes` is an upper bound or unknown (0), so the UI shows "up to" / "varies" and keeps it
+    /// out of the "can be cleaned" total.
+    pub estimate: bool,
     pub items: Vec<Item>,
     pub recycles: bool,
     pub action: String,

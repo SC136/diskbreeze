@@ -29,6 +29,13 @@ pub struct Entry {
     pub action: String,
     pub command: Option<String>,
     pub fallback: Option<String>,
+    /// For action = "admin": the PowerShell script that runs after Windows' permission prompt.
+    pub script: Option<String>,
+    /// For action = "admin": finishes the sentence "Windows will ask for administrator permission to …".
+    pub label: Option<String>,
+    /// The saving can't be measured up front (e.g. the Windows component store): show "varies".
+    #[serde(default)]
+    pub size_unknown: bool,
     #[serde(default)]
     pub min_age_days: u32,
     #[serde(default = "default_min_mb")]
@@ -53,6 +60,9 @@ fn validate(e: &Entry) -> Result<(), String> {
         "delete" | "contents" | "recycle" | "manual" => {}
         "command" if e.command.is_none() => return err("action = \"command\" needs a `command`"),
         "command" => {}
+        "admin" if e.script.is_none() || e.label.is_none() => return err("action = \"admin\" needs a `script` and a `label`"),
+        "admin" if e.tier != Tier::Ask => return err("admin actions must be tier = \"ask\": the user decides, never pre-ticked"),
+        "admin" => {}
         other => return err(&format!("unknown action `{other}`")),
     }
     if let Some(f) = &e.fallback {
@@ -101,23 +111,34 @@ fn resolve(e: &Entry) -> Option<Finding> {
     if targets.is_empty() {
         return None;
     }
-    let mut items: Vec<Item> = targets
-        .par_iter()
-        .map(|p| Item {
-            path: p.to_string_lossy().into_owned(),
-            bytes: size::size_of(p),
-            note: None,
-            open: None,
-        })
-        .collect();
-    let bytes: u64 = items.iter().map(|i| i.bytes).sum();
-    if bytes < e.min_mb * MB {
+    // Sizes we can't know up front (the component store counts hard links twice) are skipped
+    // entirely: no walk, no size, shown as "varies".
+    let (mut items, bytes): (Vec<Item>, u64) = if e.size_unknown {
+        (vec![], 0)
+    } else {
+        let items: Vec<Item> = targets
+            .par_iter()
+            .map(|p| Item {
+                path: p.to_string_lossy().into_owned(),
+                bytes: size::size_of(p),
+                note: None,
+                open: None,
+            })
+            .collect();
+        let bytes = items.iter().map(|i| i.bytes).sum();
+        (items, bytes)
+    };
+    if !e.size_unknown && bytes < e.min_mb * MB {
         return None;
     }
     items.retain(|i| i.bytes > 0);
     items.sort_by(|a, b| b.bytes.cmp(&a.bytes));
 
     let plan = match e.action.as_str() {
+        "admin" => Plan::Admin {
+            script: e.script.clone().unwrap_or_default(),
+            label: e.label.clone().unwrap_or_default(),
+        },
         "command" => Plan::Command {
             cmd: e.command.clone().unwrap_or_default(),
             fallback: e
@@ -138,6 +159,7 @@ fn resolve(e: &Entry) -> Option<Finding> {
         open: e.open.clone(),
         bytes,
         selectable: plan.itemizable() && items.len() > 1,
+        estimate: e.size_unknown,
         items,
         recycles: plan.recycles(),
         action: plan.summary(),
@@ -166,12 +188,36 @@ mod tests {
 
     #[test]
     fn nothing_in_the_catalog_resolves_to_a_protected_folder() {
-        for e in parse(WINDOWS).unwrap().iter().filter(|e| e.action != "manual") {
+        // Admin entries run their own reviewed script (see the test below), not the delete path.
+        for e in parse(WINDOWS).unwrap().iter().filter(|e| e.action != "manual" && e.action != "admin") {
             for template in &e.paths {
                 for p in paths::expand(template) {
                     assert!(!paths::is_protected(&p), "{} resolves to protected {}", e.id, p.display());
                 }
             }
+        }
+    }
+
+    /// Anything that runs as administrator is reviewed here. The list of allowed building blocks is
+    /// deliberately tiny: if a new admin entry needs something else, this test makes you stop and look.
+    #[test]
+    fn admin_scripts_only_use_reviewed_commands() {
+        const ALLOWED: &[&str] = &[
+            "powercfg.exe /hibernate off",
+            "Dism.exe /Online /Cleanup-Image /StartComponentCleanup",
+        ];
+        for e in parse(WINDOWS).unwrap().iter().filter(|e| e.action == "admin") {
+            assert_eq!(e.tier, Tier::Ask, "{}: admin actions are never pre-ticked", e.id);
+            let script = e.script.as_deref().unwrap().trim();
+            let reviewed_update_cleanup = e.id == "windows-update-leftovers"
+                && script.contains(r"$env:windir\SoftwareDistribution\Download")
+                && !script.contains("Invoke-")
+                && !script.contains("http");
+            assert!(
+                ALLOWED.contains(&script) || reviewed_update_cleanup,
+                "{}: admin script isn't on the reviewed list: {script}",
+                e.id
+            );
         }
     }
 

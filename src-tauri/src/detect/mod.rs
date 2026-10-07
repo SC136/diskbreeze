@@ -1,8 +1,12 @@
+pub mod apps;
 pub mod bigfiles;
+pub mod docker;
 pub mod downloads;
+pub mod onedrive;
 pub mod projects;
 pub mod recycle_bin;
 pub mod steam;
+pub mod wsl;
 
 /// Top-level folders (lowercase) that belong to Windows, apps or game launchers. Never searched
 /// for projects or big files on a drive.

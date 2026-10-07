@@ -1,3 +1,4 @@
+mod admin;
 mod catalog;
 mod clean;
 mod detect;
@@ -100,9 +101,24 @@ async fn clean(selections: Vec<Selection>, state: State<'_, AppState>) -> Result
     .map_err(|e| e.to_string())
 }
 
+/// "1.5 GB" / "60 MB" for messages built in the backend.
+pub fn fmt_bytes(b: u64) -> String {
+    const MB: f64 = 1024.0 * 1024.0;
+    let b = b as f64;
+    if b >= 1024.0 * MB {
+        format!("{:.1} GB", b / (1024.0 * MB))
+    } else {
+        format!("{:.0} MB", b / MB)
+    }
+}
+
 #[tauri::command]
 fn open_target(target: String) -> Result<(), String> {
     let t = target.as_str();
+    // "uninstall:<registry key we listed>": opens that program's own uninstaller.
+    if let Some(key) = t.strip_prefix("uninstall:") {
+        return detect::apps::launch_uninstaller(key);
+    }
     if t == "run:cleanmgr" {
         return Command::new("cleanmgr").spawn().map(|_| ()).map_err(|e| e.to_string());
     }

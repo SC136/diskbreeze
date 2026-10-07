@@ -13,7 +13,13 @@
 #         recycle  = move to the Recycle Bin (anything personal)
 #         command  = run the tool's own clean command; `fallback` if it fails
 #         manual   = nothing automatic; `how` explains, `open` links somewhere
+#         admin    = run a PowerShell `script` as administrator after Windows' own permission
+#                    prompt; `label` finishes "Windows will ask for permission to …".
+#                    Must be tier "ask". Every admin script is pinned in a test
+#                    (admin_scripts_only_use_reviewed_commands), so adding one means a reviewer
+#                    has to look at it. Keep scripts tiny and say what they undo.
 # min_mb  hide the entry when it's smaller than this (default 50)
+# size_unknown  true = the saving can't be measured up front; shown as "varies"
 #
 # Rule of thumb: if you aren't sure something regenerates, it's `ask`, not `safe`.
 
@@ -472,13 +478,32 @@ min_mb = 20
 id = "windows-update-leftovers"
 name = "Windows Update leftovers"
 category = "Windows"
-tier = "manual"
+tier = "ask"
 paths = ['%WINDIR%\SoftwareDistribution\Download']
-what = "Update files Windows already installed."
-how = "Open Disk Cleanup → Clean up system files → tick Windows Update Cleanup. Needs admin rights."
-open = "run:cleanmgr"
-action = "manual"
+what = "Update files Windows already downloaded and installed."
+after = "Windows downloads an update again if it ever needs it. Updates waiting to install are re-fetched, so this is best done when Windows Update isn't mid-way through something."
+action = "admin"
+label = "clear downloaded Windows update files"
+script = '''
+$was = @(Get-Service -Name bits, wuauserv -ErrorAction SilentlyContinue | Where-Object Status -eq 'Running' | ForEach-Object Name)
+Stop-Service -Name bits, wuauserv -Force -ErrorAction SilentlyContinue
+Get-ChildItem -LiteralPath "$env:windir\SoftwareDistribution\Download" -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+foreach ($s in $was) { Start-Service -Name $s -ErrorAction SilentlyContinue }
+'''
 min_mb = 500
+
+[[item]]
+id = "component-store"
+name = "Old Windows component versions"
+category = "Windows"
+tier = "ask"
+paths = ['%WINDIR%\WinSxS']
+what = "After updates, Windows keeps old versions of its own system components. This removes the ones nothing needs anymore. It's the same cleanup Windows runs by itself every so often."
+after = "Takes a few minutes. The saving varies, usually 1 to 5 GB. The size of the WinSxS folder in Explorer is not what you get back, so DiskBreeze doesn't show one."
+action = "admin"
+label = "clean up old Windows component versions"
+script = 'Dism.exe /Online /Cleanup-Image /StartComponentCleanup'
+size_unknown = true
 
 [[item]]
 id = "windows-old"
@@ -496,9 +521,11 @@ min_mb = 1000
 id = "hibernation-file"
 name = "Hibernation file"
 category = "Windows"
-tier = "manual"
+tier = "ask"
 paths = ['%SystemDrive%\hiberfil.sys']
 what = "Where Windows saves memory when the PC hibernates. Fast Startup uses it too."
-how = "If you never hibernate, open Terminal as admin and run powercfg /h off. You lose Hibernate and Fast Startup."
-action = "manual"
+after = "You lose Hibernate and Fast Startup (your PC may start a little slower). To get them back, open Terminal as administrator and run: powercfg /h on"
+action = "admin"
+label = "turn off hibernation"
+script = 'powercfg.exe /hibernate off'
 min_mb = 2000

@@ -1,5 +1,6 @@
+use crate::detect::{docker, onedrive};
 use crate::model::{CleanOutcome, Finding, Plan};
-use crate::{paths, size};
+use crate::{admin, paths, scan, size};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -14,17 +15,36 @@ pub fn run(findings: &[&Finding]) -> Vec<CleanOutcome> {
 
 fn clean_one(f: &Finding) -> CleanOutcome {
     let mut targets = targets_of(&f.plan);
-    if targets.is_empty() && matches!(f.plan, Plan::Command { .. }) {
-        // A tool cleans its own folders (npm, pnpm…): measure the folders we listed for it.
+    if targets.is_empty() && matches!(f.plan, Plan::Command { .. } | Plan::Admin { .. }) {
+        // A tool or admin step cleans its own folders (npm, Windows Update…): measure the
+        // folders we listed for it.
         targets = f.items.iter().map(|i| PathBuf::from(&i.path)).collect();
     }
+    // When the saving can't be read off a folder (component store, WSL disks), compare the
+    // drive's free space instead.
+    let drive = f.items.first().and_then(|i| paths::drive_of(Path::new(&i.path))).unwrap_or_else(paths::profile_drive);
+    let by_free_space = matches!(f.plan, Plan::Admin { .. }) && targets.is_empty();
+    let free_before = scan::disk_info(&drive).free;
     let before: u64 = targets.iter().map(|p| size::size_of(p)).sum();
     let result = execute(&f.plan);
     let after: u64 = targets.iter().map(|p| size::size_of(p)).sum();
-    let freed = match &f.plan {
+    let mut freed = match &f.plan {
         Plan::EmptyRecycleBin(_) => f.bytes,
+        _ if by_free_space => scan::disk_info(&drive).free.saturating_sub(free_before),
         _ => before.saturating_sub(after),
     };
+    // WSL disk files are compacted by diskpart; free space is the honest measure there too.
+    if f.id == "wsl-vhdx-compact" {
+        freed = scan::disk_info(&drive).free.saturating_sub(free_before).max(before.saturating_sub(after));
+    }
+    // Docker prune frees space inside Docker's disk file, not on the Windows drive.
+    let inside_vm = docker::NO_HOST_SAVINGS.contains(&f.id.as_str());
+    let note = inside_vm.then(|| {
+        format!("Freed inside Docker (up to {}). To get it back on Windows, also shrink Docker's disk file.", crate::fmt_bytes(f.bytes))
+    });
+    if inside_vm {
+        freed = 0;
+    }
     let paths: Vec<String> = if targets.is_empty() {
         f.items.iter().map(|i| i.path.clone()).collect()
     } else {
@@ -32,7 +52,7 @@ fn clean_one(f: &Finding) -> CleanOutcome {
     };
     let (id, name) = (f.id.clone(), f.name.clone());
     match result {
-        Ok(()) => CleanOutcome { id, name, ok: true, bytes: freed, recycled: f.plan.recycles(), message: None, paths },
+        Ok(()) => CleanOutcome { id, name, ok: true, bytes: freed, recycled: f.plan.recycles(), message: note, paths },
         Err(e) => CleanOutcome { id, name, ok: false, bytes: freed, recycled: false, message: Some(e), paths },
     }
 }
@@ -84,6 +104,8 @@ fn execute(plan: &Plan) -> Result<(), String> {
                 .collect();
             trash::os_limited::purge_all(items).map_err(|e| e.to_string())
         }
+        Plan::Admin { script, .. } => admin::run_script(script),
+        Plan::Dehydrate(ps) => onedrive::dehydrate(ps),
         Plan::Manual => Err("This one has to be done by hand".into()),
     }
 }

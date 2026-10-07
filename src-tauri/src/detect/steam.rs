@@ -43,6 +43,7 @@ pub fn detect(drive: &str) -> Option<Finding> {
         open: Some("steam://open/games".into()),
         bytes,
         selectable: false,
+        estimate: false,
         items: games,
         recycles: false,
         action: Plan::Manual.summary(),

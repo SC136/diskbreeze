@@ -3,6 +3,27 @@ use std::fs::{self, Metadata};
 use std::path::Path;
 use std::time::SystemTime;
 
+/// Windows file attributes used by OneDrive's Files On-Demand.
+pub const ATTR_PINNED: u32 = 0x0008_0000; // "Always keep on this device"
+pub const ATTR_UNPINNED: u32 = 0x0010_0000; // "Free up space"
+const ATTR_CLOUD_ONLY: u32 = 0x1000 /* OFFLINE */ | 0x0004_0000 /* RECALL_ON_OPEN */ | 0x0040_0000 /* RECALL_ON_DATA_ACCESS */;
+
+/// True when the file is only a placeholder: its content lives in the cloud, not on this disk.
+pub fn is_cloud_only(attrs: u32) -> bool {
+    attrs & ATTR_CLOUD_ONLY != 0
+}
+
+#[cfg(windows)]
+pub fn attrs_of(path: &Path) -> u32 {
+    use std::os::windows::fs::MetadataExt;
+    fs::symlink_metadata(path).map(|m| m.file_attributes()).unwrap_or(0)
+}
+
+#[cfg(not(windows))]
+pub fn attrs_of(_path: &Path) -> u32 {
+    0
+}
+
 /// Bytes actually stored on this disk for one file. OneDrive "online-only"
 /// placeholders report their full size but take no space, so they count as 0.
 fn file_bytes(meta: &Metadata) -> u64 {

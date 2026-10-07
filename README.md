@@ -18,6 +18,10 @@ Get the Windows installer from the [releases page](https://github.com/SC136/disk
    - forgotten Downloads: ISOs, archives you already unpacked, installer folders, big old files
    - installed Steam games, with last-played dates
    - the Recycle Bin
+   - **OneDrive:** big files you haven't touched in a month that can become online-only (the copy in OneDrive stays; pinned files are never listed)
+   - **Docker and WSL:** what Docker could reclaim (unused images, stopped containers, build cache; volumes are never touched), and the disk files WSL and Docker Desktop keep, which can be shrunk to give space back to Windows
+   - **Windows system space** that needs administrator permission: downloaded update files, old component versions, the hibernation file. Windows shows its own permission prompt first, and nothing runs unless you allow it
+   - your biggest **installed programs**, each with a button that opens its own uninstaller
 
    **Pick a drive.** The drive that holds your Windows profile gets everything above. Any other drive is searched for old code projects, big loose files (disk images, archives, videos, VM disks, backups), Steam games and its own Recycle Bin. Parts of installed games and apps are never offered.
 2. **Sorts** the results into three groups: *Safe to clean* (pre-ticked), *Your call* (never pre-ticked) and *Do it yourself* (needs another app or admin rights, so we only explain).
@@ -34,6 +38,8 @@ The UI uses [Fluent 2](https://fluent2.microsoft.design/) via `@fluentui/react-c
 
 ## Safety
 
+- **Administrator steps are fixed and reviewed.** The commands that run as admin live in the catalog (and a couple of detectors), never come from the UI, are passed to Windows on the command line instead of through a file another program could swap, and are pinned by a test so adding one needs a reviewer to look at it.
+- **Everything is logged locally.** *History* in the app lists every cleanup: what, when, how much, and what failed.
 - The UI only ever sends finding **ids**. What gets deleted comes from the scan the backend ran itself.
 - Every delete passes `paths::is_protected` (drive roots, Windows, your profile folders, Program Files…).
 - Symlinks and junctions are never followed. OneDrive cloud-only files count as zero bytes.
