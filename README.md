@@ -1,12 +1,38 @@
+<div align="center">
+
+<img src="public/logo.svg" alt="DiskBreeze logo" width="96" height="96">
+
 # DiskBreeze
 
-Find out what's filling your disk, understand it in plain English, and clean only what you choose.
+**Find out what's filling your disk, understand it in plain English, and clean only what you choose.**
 
-![Scan results: tabs for Safe to clean, Your call and Do it yourself, with per-item checkboxes](docs/screenshots/results.png)
+[![Release](https://img.shields.io/github/v/release/SC136/diskbreeze?color=1c867d&label=release)](https://github.com/SC136/diskbreeze/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-1c867d)](LICENSE)
+![Platform: Windows](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-1c867d)
+![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%20%2B%20React%20%2B%20Rust-1c867d)
+
+[Download](#download) · [What it does](#what-it-does) · [Safety](#safety) · [Contribute](#contributing-a-catalog-entry) · [Develop](#develop) · [Landing page](#landing-page)
+
+<br>
+
+<img src="docs/screenshots/landing-hero.png" alt="The DiskBreeze landing page: 'Clean your disk, only what you choose' with the app window below" width="860">
+
+</div>
+
+## Highlights
+
+- **Scanning changes nothing.** You review every cleanup before it runs.
+- **Plain-English results.** Every finding says what it is, and what you will notice after cleaning.
+- **Three honest groups.** *Safe to clean* is pre-ticked, *Your call* never is, and *Do it yourself* is only explained.
+- **Recycle Bin first.** Personal files can be recovered; only caches that rebuild themselves are deleted for good.
+- **Private by design.** Nothing about your files leaves your computer. The only network request is an update check you can turn off.
+- **Open catalog.** 50 space hogs described in plain TOML that anyone can improve, no Rust needed.
 
 ## Download
 
 Get the Windows installer from the [releases page](https://github.com/SC136/diskbreeze/releases) (about 2 MB). It isn't code-signed yet, so Windows SmartScreen may warn on first run: click **More info → Run anyway**. Scanning never changes anything, and you review every cleanup before it runs.
+
+![Scan results: tabs for Safe to clean, Your call and Do it yourself, with per-item checkboxes](docs/screenshots/results.png)
 
 ![Results screen with a breakdown of what was cleaned, and the shareable card](docs/screenshots/done.png)
 
@@ -74,6 +100,17 @@ cargo run -- --scan-json # read-only scan printed as JSON, handy for bug reports
 ```
 
 Requires Node, Rust and the WebView2 runtime (already on Windows 11).
+
+## Landing page
+
+A static, build-free landing page lives in [`landing/`](landing/index.html). Open `landing/index.html` in a browser, or host the folder as-is (GitHub Pages, Netlify, any static server). It only needs `landing/img/` next to it.
+
+<details>
+<summary>Preview the whole page</summary>
+
+![Full DiskBreeze landing page](docs/screenshots/landing-full.png)
+
+</details>
 
 ## Status
 
