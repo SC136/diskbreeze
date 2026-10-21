@@ -74,5 +74,7 @@ jobs:
           New-Item -ItemType Directory -Force out | Out-Null
           Compress-Archive -Path src-tauri/target/release/diskbreeze.exe -DestinationPath "out/DiskBreeze_${version}_x64-portable.zip"
           Copy-Item "src-tauri/target/release/bundle/nsis/DiskBreeze_${version}_x64-setup.exe" out/
+          Copy-Item "out/DiskBreeze_${version}_x64-portable.zip" "out/DiskBreeze_x64-portable.zip"
+          Copy-Item "out/DiskBreeze_${version}_x64-setup.exe" "out/DiskBreeze_x64-setup.exe"
           Get-ChildItem out -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt
-          gh release upload $tag out/DiskBreeze_${version}_x64-portable.zip out/SHA256SUMS.txt --clobber
+          gh release upload $tag out/DiskBreeze_${version}_x64-portable.zip out/DiskBreeze_x64-portable.zip out/DiskBreeze_x64-setup.exe out/SHA256SUMS.txt --clobber

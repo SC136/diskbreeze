@@ -17,7 +17,7 @@
 
 <br>
 
-[**⬇️ Download**](https://github.com/SC136/diskbreeze/releases/latest) &nbsp;·&nbsp;
+[**⬇️ Download**](https://github.com/SC136/diskbreeze/releases/latest/download/DiskBreeze_x64-setup.exe) &nbsp;·&nbsp;
 [📝 Release notes](https://github.com/SC136/diskbreeze/releases) &nbsp;·&nbsp;
 [🐞 Report an issue](https://github.com/SC136/diskbreeze/issues) &nbsp;·&nbsp;
 [🤝 Contribute](CONTRIBUTING.md) &nbsp;·&nbsp;
@@ -74,9 +74,11 @@ Most cleaners show a big scary number and a "Clean" button. DiskBreeze does the 
 
 ## 📥 Download and install
 
-1. Go to the **[latest release](https://github.com/SC136/diskbreeze/releases/latest)** (the installer is about 2 MB).
-2. Run `DiskBreeze_<version>_x64-setup.exe`, or unzip the portable build and run `diskbreeze.exe`.
-3. Optional: verify the download against `SHA256SUMS.txt` from the same release.
+1. **[Download the installer](https://github.com/SC136/diskbreeze/releases/latest/download/DiskBreeze_x64-setup.exe)** (about 2 MB), or grab the [portable zip](https://github.com/SC136/diskbreeze/releases/latest/download/DiskBreeze_x64-portable.zip) instead.
+2. Run `DiskBreeze_x64-setup.exe`, or unzip the portable build and run `diskbreeze.exe`.
+3. Optional: verify the download against `SHA256SUMS.txt` from the [latest release](https://github.com/SC136/diskbreeze/releases/latest).
+
+Release signing is being set up: free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/). See the [code signing policy](CODE_SIGNING.md) and the [privacy policy](PRIVACY.md).
 
 > [!NOTE]
 > ⚠️ DiskBreeze is not code-signed yet, so Windows SmartScreen may warn on first run. Click **More info → Run anyway**. Scanning never changes anything, and you review every cleanup before it runs.
