@@ -64,27 +64,11 @@ Most cleaners show a big scary number and a "Clean" button. DiskBreeze does the 
 
 <div align="center">
 
-**The app**
-
 <img src="docs/screenshots/results.png" alt="Scan results with the tabs Safe to clean, Your call and Do it yourself, and per-item checkboxes" width="720">
 
 <br>
 
 <img src="docs/screenshots/done.png" alt="Results screen with a breakdown of what was cleaned, next to the shareable before and after card" width="720">
-
-<br>
-
-**The landing page**
-
-<img src="docs/screenshots/landing-hero.png" alt="DiskBreeze landing page hero" width="720">
-
-<details>
-<summary><b>Preview the whole landing page</b></summary>
-<br>
-
-<img src="docs/screenshots/landing-full.png" alt="Full DiskBreeze landing page" width="560">
-
-</details>
 
 </div>
 
