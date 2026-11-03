@@ -127,6 +127,28 @@ export async function clean(selections: Selection[]): Promise<CleanReport> {
   };
 }
 
+export async function emptyRecycleBin(): Promise<CleanReport> {
+  if (inTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<CleanReport>("empty_recycle_bin");
+  }
+  await sleep(800);
+  return {
+    before: mockDisk,
+    after: { ...mockDisk, free: mockDisk.free + 15.1 * GB },
+    outcomes: [
+      {
+        id: "recycle-bin",
+        name: "Recycle Bin (C:)",
+        ok: true,
+        bytes: 15.1 * GB,
+        recycled: false,
+        message: null,
+      },
+    ],
+  };
+}
+
 export async function appVersion(): Promise<string> {
   if (inTauri) {
     const { getVersion } = await import("@tauri-apps/api/app");

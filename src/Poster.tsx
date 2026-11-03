@@ -16,9 +16,19 @@ export function freedBytes(report: CleanReport): number {
   return report.outcomes.filter((o) => o.ok && !o.recycled).reduce((s, o) => s + o.bytes, 0);
 }
 
+/** Total bytes of items sent to Recycle Bin. */
+export function recycledBytes(report: CleanReport): number {
+  return report.outcomes.filter((o) => o.ok && o.recycled).reduce((s, o) => s + o.bytes, 0);
+}
+
 /** The headline should match the achievement: don't gloat over 26 MB. */
-function headline(freed: number): ReactNode {
-  const gb = freed / GB;
+function headline(bytes: number, allRecycled: boolean): ReactNode {
+  const gb = bytes / GB;
+  if (allRecycled) {
+    if (gb < 1) return <>A tidier drive. <span>In Recycle Bin.</span></>;
+    if (gb < 20) return <>My drive just got <em>lighter.</em></>;
+    return <>My drive is ready to <em>breathe.</em></>;
+  }
   if (gb < 1) return <>A tidier drive. <span>Every bit counts.</span></>;
   if (gb < 20) return <>My drive just got <em>lighter.</em></>;
   return <>My drive can <em>breathe</em> again. <span>Finally.</span></>;
@@ -28,19 +38,24 @@ function headline(freed: number): ReactNode {
 export const Poster = forwardRef<HTMLDivElement, { report: CleanReport; rows: CleanedRow[] }>(({ report, rows }, ref) => {
   const { before, after } = report;
   const freed = freedBytes(report);
-  const { n, unit } = fmtParts(freed);
+  const recycled = recycledBytes(report);
+  const allRecycled = freed === 0 && recycled > 0;
+  const displayBytes = allRecycled ? recycled : freed;
+  const { n, unit } = fmtParts(displayBytes);
   const usedPct = (d: typeof before) => Math.round(((d.total - d.free) / d.total) * 100);
   const circ = 2 * Math.PI * 84;
   const ring = (pct: number, color: string) => (
     <svg viewBox="0 0 200 200">
       <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="18" />
       <circle cx="100" cy="100" r="84" fill="none" stroke={color} strokeWidth="18" strokeLinecap="round"
-        strokeDasharray={`${(circ * pct) / 100} ${circ}`} />
+        strokeDasharray={`${(circ * Math.min(100, Math.max(0, pct))) / 100} ${circ}`} />
     </svg>
   );
+  const projectedAfter = allRecycled ? { ...after, free: Math.min(after.total, before.free + recycled) } : after;
+  const afterLabel = allRecycled ? "After emptying" : "After";
   const gauges = [
     { label: "Before", disk: before, color: "#ff8a7a" },
-    { label: "After", disk: after, color: "#4fd1a5" },
+    { label: afterLabel, disk: projectedAfter, color: "#4fd1a5" },
   ];
   const top = [...rows].sort((a, b) => b.bytes - a.bytes).slice(0, 4);
   const more = rows.length - top.length;
@@ -54,10 +69,13 @@ export const Poster = forwardRef<HTMLDivElement, { report: CleanReport; rows: Cl
           <span className="p-pill">Disk cleanup</span>
           <span className="p-date">{new Date().toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
         </div>
-        <h1 className="p-h1">{headline(freed)}</h1>
+        <h1 className="p-h1">{headline(displayBytes, allRecycled)}</h1>
         <div className="p-hero">
           <div className="p-big">{n}</div>
-          <div className="p-unit"><b>{unit}</b><span>of space freed up</span></div>
+          <div className="p-unit">
+            <b>{unit}</b>
+            <span>{allRecycled ? "moved to Recycle Bin" : "of space freed up"}</span>
+          </div>
         </div>
         {top.length > 0 && (
           <ul className="p-list">

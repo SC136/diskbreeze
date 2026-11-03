@@ -11,7 +11,7 @@ import {
 import { toPng } from "html-to-image";
 import { APP_NAME, freedBytes, Poster, type CleanedRow } from "./Poster";
 import {
-  appVersion, checkForUpdate, clean, fmt, fmtGB, fmtParts, getHistory, historyReport, inTauri, installUpdate, listDrives,
+  appVersion, checkForUpdate, clean, emptyRecycleBin, fmt, fmtGB, fmtParts, getHistory, historyReport, inTauri, installUpdate, listDrives,
   openHistoryFolder, openTarget, reveal, savePoster, scan, scanReport, shortNotes,
 } from "./api";
 import { darkTheme, lightTheme } from "./theme";
@@ -704,13 +704,49 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
   const ref = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const freed = freedBytes(report);
-  const { n, unit } = fmtParts(freed);
-  const name = (id: string) => result.findings.find((f) => f.id === id)?.name ?? id;
-  const done = report.outcomes.filter((o) => o.ok);
-  const failed = report.outcomes.filter((o) => !o.ok);
+  const [currentReport, setCurrentReport] = useState<CleanReport>(report);
+  const [emptyingBin, setEmptyingBin] = useState(false);
+  const [binEmptiedMsg, setBinEmptiedMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentReport(report);
+    setBinEmptiedMsg(null);
+  }, [report]);
+
+  const freed = freedBytes(currentReport);
+  const done = currentReport.outcomes.filter((o) => o.ok);
+  const failed = currentReport.outcomes.filter((o) => !o.ok);
   const recycled = done.filter((o) => o.recycled).reduce((s, o) => s + o.bytes, 0);
+  const allRecycled = freed === 0 && recycled > 0;
+  const displayBytes = allRecycled ? recycled : freed;
+  const { n, unit } = fmtParts(displayBytes);
+  const name = (id: string) => result.findings.find((f) => f.id === id)?.name ?? id;
   const rows: CleanedRow[] = done.filter((o) => o.bytes > 0).map((o) => ({ name: name(o.id), bytes: o.bytes, recycled: o.recycled }));
+
+  async function handleEmptyBin() {
+    setEmptyingBin(true);
+    setSaveError(null);
+    try {
+      const binReport = await emptyRecycleBin();
+      const reclaimed = binReport.outcomes.find((o) => o.id === "recycle-bin")?.bytes ?? recycled;
+      setCurrentReport((prev) => {
+        const updatedOutcomes = prev.outcomes.map((o) =>
+          o.recycled ? { ...o, recycled: false } : o
+        );
+        const newFree = Math.max(prev.after.free + reclaimed, binReport.after.free);
+        return {
+          before: prev.before,
+          after: { ...prev.after, free: newFree },
+          outcomes: updatedOutcomes,
+        };
+      });
+      setBinEmptiedMsg(`Recycle Bin emptied! ${fmt(reclaimed > 0 ? reclaimed : recycled)} permanently reclaimed on ${currentReport.before.mount || "Drive"}.`);
+    } catch (e) {
+      setSaveError(`Failed to empty Recycle Bin: ${e}`);
+    } finally {
+      setEmptyingBin(false);
+    }
+  }
 
   async function save() {
     if (!ref.current) return;
@@ -727,16 +763,48 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
     <main className="done">
       <div className="done-left">
         <Caption1 className="muted">{failed.length > 0 ? "Finished with some problems" : "All done"}</Caption1>
-        <div className="free"><LargeTitle as="span">{n} {unit}</LargeTitle><Body1 className="muted"> freed</Body1></div>
-        <div className="stat-row">
-          <div className="stat"><Caption1 className="muted">Free before</Caption1><b>{fmtGB(report.before.free)}</b></div>
-          <div className="stat"><Caption1 className="muted">Free now</Caption1><b>{fmtGB(report.after.free)}</b></div>
-          <div className="stat"><Caption1 className="muted">Cleaned</Caption1><b>{done.length} of {report.outcomes.length}</b></div>
+        <div className="free">
+          <LargeTitle as="span">{n} {unit}</LargeTitle>
+          <Body1 className="muted">
+            {allRecycled ? " moved to Recycle Bin" : recycled > 0 ? ` freed (+ ${fmt(recycled)} in Recycle Bin)` : " freed"}
+          </Body1>
         </div>
-        {recycled > 0 && (
-          <MessageBar intent="info"><MessageBarBody>
-            {fmt(recycled)} went to the Recycle Bin and still uses space. Empty the bin to get it back.
-          </MessageBarBody></MessageBar>
+        <div className="stat-row">
+          <div className="stat"><Caption1 className="muted">Free before</Caption1><b>{fmtGB(currentReport.before.free)}</b></div>
+          <div className="stat"><Caption1 className="muted">Free now</Caption1><b>{fmtGB(currentReport.after.free)}</b></div>
+          {recycled > 0 && (
+            <div className="stat"><Caption1 className="muted">In Recycle Bin</Caption1><b>{fmt(recycled)}</b></div>
+          )}
+          <div className="stat"><Caption1 className="muted">Cleaned</Caption1><b>{done.length} of {currentReport.outcomes.length}</b></div>
+        </div>
+        {binEmptiedMsg && (
+          <MessageBar intent="success">
+            <MessageBarBody>{binEmptiedMsg}</MessageBarBody>
+          </MessageBar>
+        )}
+        {recycled > 0 && !binEmptiedMsg && (
+          <MessageBar intent="info" layout="multiline">
+            <MessageBarBody>
+              <b>{fmt(recycled)} was moved to the Recycle Bin for safety.</b> It still uses drive space until the bin is emptied.
+            </MessageBarBody>
+            <MessageBarActions>
+              <Button
+                appearance="primary"
+                size="small"
+                disabled={emptyingBin}
+                onClick={handleEmptyBin}
+              >
+                {emptyingBin ? "Emptying…" : "Empty Recycle Bin"}
+              </Button>
+              <Button
+                appearance="subtle"
+                size="small"
+                onClick={() => openTarget("shell:RecycleBinFolder")}
+              >
+                Open Recycle Bin
+              </Button>
+            </MessageBarActions>
+          </MessageBar>
         )}
         {failed.length > 0 && (
           <MessageBar intent="warning"><MessageBarBody>
@@ -746,7 +814,7 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
 
         <Subtitle2 as="h2">What happened</Subtitle2>
         <ul className="cleaned">
-          {report.outcomes.map((o) => (
+          {currentReport.outcomes.map((o) => (
             <li key={o.id}>
               <span className={o.ok ? "ok" : "bad"}>{o.ok ? <CheckmarkCircle20Filled /> : <DismissCircle20Filled />}</span>
               <div className="c-name">
@@ -767,7 +835,7 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
         {saved && <Caption1 className="muted">Saved to {saved}</Caption1>}
         {saveError && <Caption1 className="err">{saveError}</Caption1>}
       </div>
-      <div className="poster-frame"><div className="poster-scale"><Poster ref={ref} report={report} rows={rows} /></div></div>
+      <div className="poster-frame"><div className="poster-scale"><Poster ref={ref} report={currentReport} rows={rows} /></div></div>
     </main>
   );
 }

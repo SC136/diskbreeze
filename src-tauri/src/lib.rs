@@ -9,7 +9,7 @@ mod scan;
 mod size;
 
 use base64::Engine;
-use model::{CleanReport, DriveInfo, Finding, Progress, ScanResult, Selection};
+use model::{CleanOutcome, CleanReport, DriveInfo, Finding, Progress, ScanResult, Selection};
 use std::collections::HashSet;
 use std::process::Command;
 use std::sync::Mutex;
@@ -101,6 +101,44 @@ async fn clean(selections: Vec<Selection>, state: State<'_, AppState>) -> Result
     .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn empty_recycle_bin(state: State<'_, AppState>) -> Result<CleanReport, String> {
+    let drive = {
+        let d = state.drive.lock().unwrap().clone();
+        if d.is_empty() {
+            paths::profile_drive()
+        } else {
+            d
+        }
+    };
+    tauri::async_runtime::spawn_blocking(move || -> Result<CleanReport, String> {
+        let before = scan::disk_info(&drive);
+        let bytes_in_bin = detect::recycle_bin::detect(&drive).map(|f| f.bytes).unwrap_or(0);
+        let items: Vec<_> = trash::os_limited::list()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .filter(|i| paths::on_drive(&i.original_parent, &drive))
+            .collect();
+        trash::os_limited::purge_all(items).map_err(|e| e.to_string())?;
+        let after = scan::disk_info(&drive);
+        let disk_freed = after.free.saturating_sub(before.free);
+        let freed = if bytes_in_bin > 0 { bytes_in_bin } else { disk_freed };
+        let outcomes = vec![CleanOutcome {
+            id: "recycle-bin".into(),
+            name: format!("Recycle Bin ({drive})"),
+            ok: true,
+            bytes: freed,
+            recycled: false,
+            message: None,
+            paths: vec![],
+        }];
+        let _ = history::append(&history::entry_from(&drive, &before, &after, &outcomes));
+        Ok(CleanReport { before, after, outcomes })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// "1.5 GB" / "60 MB" for messages built in the backend.
 pub fn fmt_bytes(b: u64) -> String {
     const MB: f64 = 1024.0 * 1024.0;
@@ -168,7 +206,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .invoke_handler(tauri::generate_handler![list_drives, get_history, open_history_folder, scan, clean, open_target, reveal, save_poster])
+        .invoke_handler(tauri::generate_handler![list_drives, get_history, open_history_folder, scan, clean, empty_recycle_bin, open_target, reveal, save_poster])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
