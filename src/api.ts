@@ -154,7 +154,7 @@ export async function appVersion(): Promise<string> {
     const { getVersion } = await import("@tauri-apps/api/app");
     return getVersion();
   }
-  return "0.2.1";
+  return "0.3.3";
 }
 
 export async function getHistory(): Promise<HistoryEntry[]> {
