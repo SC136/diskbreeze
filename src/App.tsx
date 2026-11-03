@@ -207,8 +207,8 @@ export default function App() {
       setResult(r);
       const pick = new URLSearchParams(location.search).get("pick");
       setChecked(pick ? new Set(pick.split(",")) : safeIds(r));
-      if (demo === "done" || demo === "small") {
-        const ids = demo === "small" ? ["temp-files"] : [...safeIds(r)];
+      if (demo === "done" || demo === "small" || demo === "recycled") {
+        const ids = demo === "small" ? ["temp-files"] : demo === "recycled" ? ["downloads-disk-images"] : [...safeIds(r)];
         setReport(await clean(ids.map((id) => ({ id }))));
         setPhase("done");
       } else {
@@ -792,6 +792,7 @@ function Done({ report, result, onAgain }: { report: CleanReport; result: ScanRe
                 appearance="primary"
                 size="small"
                 disabled={emptyingBin}
+                id="empty-bin-btn"
                 onClick={handleEmptyBin}
               >
                 {emptyingBin ? "Emptying…" : "Empty Recycle Bin"}
