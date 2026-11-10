@@ -228,7 +228,6 @@ export default function App() {
       <div className="app">
         <TitleBar />
         <header className="bar">
-          <div className="brand"><img className="mark" src="/logo.svg" alt="" width={24} height={24} />{APP_NAME}</div>
           <div className="bar-actions">
             {phase === "results" && drives.length > 1 && <DriveSwitcher drives={drives} value={drive} onPick={(d) => startScan(d)} />}
             {phase === "results" && <Button appearance="subtle" icon={<ArrowSync20Regular />} onClick={() => startScan()}>Scan again</Button>}
