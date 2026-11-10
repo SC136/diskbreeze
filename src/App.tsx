@@ -15,6 +15,7 @@ import {
   openHistoryFolder, openTarget, reveal, savePoster, scan, scanReport, shortNotes,
 } from "./api";
 import { darkTheme, lightTheme } from "./theme";
+import { TitleBar } from "./TitleBar";
 import type { CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, Tier, UpdateInfo } from "./types";
 
 const AUTO_UPDATE_KEY = "diskbreeze.autoUpdate";
@@ -225,6 +226,7 @@ export default function App() {
     <FluentProvider theme={dark ? darkTheme : lightTheme}>
       <div className="shell">
       <div className="app">
+        <TitleBar />
         <header className="bar">
           <div className="brand"><img className="mark" src="/logo.svg" alt="" width={24} height={24} />{APP_NAME}</div>
           <div className="bar-actions">
