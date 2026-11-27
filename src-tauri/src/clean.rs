@@ -1,5 +1,5 @@
 use crate::detect::{docker, onedrive};
-use crate::model::{CleanOutcome, Finding, Plan};
+use crate::model::{CleanOutcome, CleanProgress, Finding, Plan};
 use crate::{admin, paths, scan, size};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -7,10 +7,21 @@ use std::process::Command;
 
 /// Clean the given findings. The Recycle Bin always goes last so files we just
 /// moved there are emptied too only if the user selected it.
-pub fn run(findings: &[&Finding]) -> Vec<CleanOutcome> {
+pub fn run(findings: &[&Finding], progress: impl Fn(CleanProgress<'_>)) -> Vec<CleanOutcome> {
     let mut ordered: Vec<&Finding> = findings.to_vec();
     ordered.sort_by_key(|f| matches!(f.plan, Plan::EmptyRecycleBin(_)));
-    ordered.iter().map(|f| clean_one(f)).collect()
+    let total = ordered.len();
+    let mut outcomes = Vec::with_capacity(total);
+    for finding in ordered {
+        progress(CleanProgress {
+            completed: outcomes.len(),
+            total,
+            current: Some(&finding.name),
+        });
+        outcomes.push(clean_one(finding));
+    }
+    progress(CleanProgress { completed: outcomes.len(), total, current: None });
+    outcomes
 }
 
 fn clean_one(f: &Finding) -> CleanOutcome {

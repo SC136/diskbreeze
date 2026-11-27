@@ -63,7 +63,7 @@ async fn scan(drive: Option<String>, app: tauri::AppHandle, state: State<'_, App
 /// keep. Every path must be one the scan itself found; what gets deleted comes
 /// from our own scan, never from the UI.
 #[tauri::command]
-async fn clean(selections: Vec<Selection>, state: State<'_, AppState>) -> Result<CleanReport, String> {
+async fn clean(selections: Vec<Selection>, app: tauri::AppHandle, state: State<'_, AppState>) -> Result<CleanReport, String> {
     let known = state.findings.lock().unwrap().clone();
     let mut selected: Vec<Finding> = vec![];
     for s in selections {
@@ -91,7 +91,9 @@ async fn clean(selections: Vec<Selection>, state: State<'_, AppState>) -> Result
     tauri::async_runtime::spawn_blocking(move || {
         let before = scan::disk_info(&drive);
         let refs: Vec<&Finding> = selected.iter().collect();
-        let outcomes = clean::run(&refs);
+        let outcomes = clean::run(&refs, |progress| {
+            let _ = app.emit("clean-progress", progress);
+        });
         let after = scan::disk_info(&drive);
         // Logging must never get in the way of the clean itself.
         let _ = history::append(&history::entry_from(&drive, &before, &after, &outcomes));

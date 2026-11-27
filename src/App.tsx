@@ -16,7 +16,7 @@ import {
 } from "./api";
 import { darkTheme, lightTheme } from "./theme";
 import { TitleBar } from "./TitleBar";
-import type { CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, Tier, UpdateInfo } from "./types";
+import type { CleanProgress, CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, Tier, UpdateInfo } from "./types";
 
 const AUTO_UPDATE_KEY = "diskbreeze.autoUpdate";
 const autoUpdateOn = () => {
@@ -62,6 +62,7 @@ export default function App() {
   const dark = useDarkMode();
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState("");
+  const [cleanProgress, setCleanProgress] = useState<CleanProgress | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [excluded, setExcluded] = useState<Excluded>({});
@@ -148,9 +149,10 @@ export default function App() {
   }
 
   async function runClean() {
+    setCleanProgress(null);
     setPhase("cleaning");
     try {
-      setReport(await clean(selections()));
+      setReport(await clean(selections(), setCleanProgress));
       setPhase("done");
     } catch (e) {
       setError(String(e));
@@ -262,7 +264,7 @@ export default function App() {
         )}
         {showHistory && <HistoryDialog onClose={() => setShowHistory(false)} />}
         {phase === "scanning" && <Busy label={progress || "Starting…"} />}
-        {phase === "cleaning" && <Busy label="Cleaning… this can take a minute for big folders." />}
+        {phase === "cleaning" && <Cleaning progress={cleanProgress} />}
         {showResults && (
           <Results
             result={result} info={drives.find((d) => d.letter === drive)} checked={checked} excluded={excluded}
@@ -415,6 +417,25 @@ function Busy({ label }: { label: string }) {
   return (
     <main className="center">
       <Spinner size="large" label={label} />
+    </main>
+  );
+}
+
+function Cleaning({ progress }: { progress: CleanProgress | null }) {
+  const detail = progress?.current ?? (progress ? "Preparing results…" : "Getting started…");
+  return (
+    <main className="center">
+      <div className="clean-progress">
+        <Subtitle2 as="h1">Cleaning</Subtitle2>
+        <div className="clean-progress-status" role="status">
+          <Body1>{detail}</Body1>
+          {progress && progress.total > 0 && (
+            <Caption1 className="muted">{progress.completed} of {progress.total} finished</Caption1>
+          )}
+        </div>
+        <ProgressBar aria-label="Cleanup progress" value={progress?.completed} max={progress?.total || 1} />
+        <Caption1 className="muted">Large folders can take longer.</Caption1>
+      </div>
     </main>
   );
 }

@@ -1,4 +1,4 @@
-import type { CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, UpdateInfo } from "./types";
+import type { CleanProgress, CleanReport, DriveInfo, Finding, HistoryEntry, ScanResult, Selection, UpdateInfo } from "./types";
 
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;
@@ -107,18 +107,32 @@ export async function scan(drive: string, onProgress: (detail: string) => void):
   };
 }
 
-export async function clean(selections: Selection[]): Promise<CleanReport> {
+export async function clean(selections: Selection[], onProgress?: (progress: CleanProgress) => void): Promise<CleanReport> {
   if (inTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
-    return invoke<CleanReport>("clean", { selections });
+    const { listen } = await import("@tauri-apps/api/event");
+    const off = onProgress && await listen<CleanProgress>("clean-progress", (e) => onProgress(e.payload));
+    try {
+      return await invoke<CleanReport>("clean", { selections });
+    } finally {
+      off?.();
+    }
   }
-  await sleep(1500);
   const rows = selections.flatMap((s) => {
     const x = [...mockFindings, ...mockDataFindings].find((m) => m.id === s.id);
     if (!x) return [];
     const bytes = s.paths ? x.items.filter((i) => s.paths!.includes(i.path)).reduce((t, i) => t + i.bytes, 0) : x.bytes;
     return [{ x, bytes }];
   });
+  if (onProgress && rows.length > 0) {
+    for (const [completed, { x }] of rows.entries()) {
+      onProgress({ completed, total: rows.length, current: x.name });
+      await sleep(1500 / rows.length);
+    }
+    onProgress({ completed: rows.length, total: rows.length, current: null });
+  } else {
+    await sleep(1500);
+  }
   const freed = rows.reduce((t, r) => t + (r.x.recycles ? 0 : r.bytes), 0);
   return {
     before: mockDisk,

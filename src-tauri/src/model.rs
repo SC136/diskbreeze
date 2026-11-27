@@ -216,3 +216,10 @@ pub struct Progress {
     pub stage: String,
     pub detail: String,
 }
+
+#[derive(Clone, Serialize)]
+pub struct CleanProgress<'a> {
+    pub completed: usize,
+    pub total: usize,
+    pub current: Option<&'a str>,
+}

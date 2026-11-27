@@ -38,6 +38,12 @@ export interface DiskInfo {
   free: number;
 }
 
+export interface CleanProgress {
+  completed: number;
+  total: number;
+  current: string | null;
+}
+
 export interface HistoryOutcome {
   name: string;
   ok: boolean;
