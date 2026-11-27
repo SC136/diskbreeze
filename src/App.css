@@ -116,7 +116,8 @@ html, body, #root { height: 100%; margin: 0; }
 .p-h1 em { font-style: normal; color: #5fd3c4; }
 .p-h1 span { color: #7e9b9c; font-weight: 500; }
 .p-hero { margin-top: 56px; display: flex; align-items: flex-end; gap: 24px; }
-.p-big { font-weight: 800; font-size: 290px; line-height: 0.8; letter-spacing: -0.06em; background: linear-gradient(100deg, #b6f3ea, #5fd3c4 55%, #62a8ff); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 8px; }
+/* Give the gradient room to cover the full digits while keeping the row spacing. */
+.p-big { font-weight: 800; font-size: 290px; line-height: 1; margin-block: -0.1em; letter-spacing: -0.06em; background: linear-gradient(100deg, #b6f3ea, #5fd3c4 55%, #62a8ff); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 8px; }
 .p-unit { padding-bottom: 14px; }
 .p-unit b { display: block; font-weight: 800; font-size: 96px; line-height: 0.9; letter-spacing: -0.03em; }
 .p-unit span { display: block; margin-top: 12px; font-size: 26px; color: #a6c2c3; }

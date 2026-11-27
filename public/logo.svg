@@ -15,7 +15,11 @@
   <circle cx="512" cy="512" r="292" fill="none" stroke="#fff" stroke-opacity=".24" stroke-width="112"/>
   <circle cx="512" cy="512" r="292" fill="none" stroke="#fff" stroke-width="112" stroke-linecap="round"
           stroke-dasharray="1320 1835" transform="rotate(-90 512 512)"/>
-  <!-- medical cross -->
-  <rect x="468" y="396" width="88" height="232" rx="26" fill="#fff"/>
-  <rect x="396" y="468" width="232" height="88" rx="26" fill="#fff"/>
+  <!-- Breeze mark from PR #1, sized to fit inside the original gauge. -->
+  <g transform="translate(512 512) scale(.72) translate(-509 -466)"
+     fill="none" stroke="#fff" stroke-width="66" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M350 410 H590 C632 410 662 380 662 342 C662 304 630 274 592 274 C554 274 530 304 530 338"/>
+    <path d="M264 512 H676 C720 512 754 544 754 586 C754 628 720 658 678 658 C640 658 614 632 614 598"/>
+    <path d="M374 614 H526"/>
+  </g>
 </svg>

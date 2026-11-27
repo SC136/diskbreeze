@@ -15,8 +15,14 @@ pub fn detect(drive: &str) -> Option<Finding> {
     for user_dir in fs::read_dir(&bin).ok()?.flatten() {
         let Ok(rd) = fs::read_dir(user_dir.path()) else { continue };
         for e in rd.flatten() {
-            let name = e.file_name().to_string_lossy().into_owned();
-            if !name.starts_with("$I") {
+            let name = e.file_name();
+            let Some(suffix) = name.as_encoded_bytes().strip_prefix(b"$I") else { continue };
+            // Splitting immediately after an ASCII prefix preserves the OsStr encoding.
+            let suffix = unsafe { std::ffi::OsStr::from_encoded_bytes_unchecked(suffix) };
+            let mut payload = std::ffi::OsString::from("$R");
+            payload.push(suffix);
+            // Windows can leave metadata behind after removing the corresponding item.
+            if fs::symlink_metadata(e.path().with_file_name(payload)).is_err() {
                 continue;
             }
             let mut header = [0u8; 16];
